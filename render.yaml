@@ -2,15 +2,12 @@ services:
   - type: web
     name: careercopilot-api
     env: python
-    rootDir: backend
-    buildCommand: pip install -r requirements.txt && playwright install chromium
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT --workers 4 --limit-concurrency 100 --timeout-keep-alive 30
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/v1/health
     envVars:
       - key: ENVIRONMENT
         value: production
-      - key: LOG_LEVEL
-        value: info
       - key: JWT_SECRET_KEY
         sync: false
       - key: DATABASE_URL
@@ -34,7 +31,7 @@ services:
       - key: REDIS_URL
         sync: false
       - key: ALLOWED_ORIGINS_STR
-        value: "https://careercopilot-ai-pi.vercel.app,http://localhost:3000"
+        sync: false
     autoDeploy: true
     region: oregon
     plan: free
@@ -42,9 +39,8 @@ services:
   - type: worker
     name: career-copilot-worker
     env: python
-    rootDir: backend
-    buildCommand: pip install -r requirements.txt && playwright install chromium
-    startCommand: python -m app.automation.workers.apply_worker
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: python -m backend.app.automation.workers.apply_worker
     envVars:
       - key: ENVIRONMENT
         value: production
@@ -58,9 +54,8 @@ services:
   - type: cron
     name: career-copilot-daily-alerts
     env: python
-    rootDir: backend
-    buildCommand: pip install -r requirements.txt
-    startCommand: python -m app.telegram_bot.bot --send-daily-alerts
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: python -m backend.app.telegram_bot.bot --send-daily-alerts
     schedule: "0 8 * * *"
     envVars:
       - key: ENVIRONMENT
