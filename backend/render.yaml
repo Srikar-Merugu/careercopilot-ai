@@ -1,0 +1,67 @@
+services:
+  - type: web
+    name: career-copilot-backend
+    env: python
+    buildCommand: pip install -r requirements.txt && playwright install chromium
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT --workers 4 --limit-concurrency 100 --timeout-keep-alive 30
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: info
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: CORS_ORIGINS
+        value: https://careercopilot.ai,https://www.careercopilot.ai
+    autoDeploy: true
+    numInstances: 1
+    plan: starter
+    scaling:
+      min: 1
+      max: 3
+
+  - type: worker
+    name: career-copilot-worker
+    env: python
+    buildCommand: pip install -r requirements.txt && playwright install chromium
+    startCommand: python -m app.automation.workers.apply_worker
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: REDIS_URL
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+    autoDeploy: true
+    plan: starter
+
+  - type: cron
+    name: career-copilot-daily-alerts
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m app.telegram_bot.bot --send-daily-alerts
+    schedule: "0 8 * * *"
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
