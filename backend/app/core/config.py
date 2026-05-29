@@ -37,8 +37,8 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql://postgres:password@db.supabase.co:5432/postgres"
 
     # Supabase Connection
-    SUPABASE_URL: str = "https://your-project.supabase.co"
-    SUPABASE_ANON_KEY: str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.your-anon-key"
+    SUPABASE_URL: str = "https://vqkrotdvxrfomjcpuoby.supabase.co"
+    SUPABASE_ANON_KEY: str = "sb_publishable_I8l_iL5HyEJt9ZlkwQWN5Q_BjjyKJ44"
     SUPABASE_SERVICE_ROLE_KEY: str = "your-service-role-key"
 
     # AI Services
