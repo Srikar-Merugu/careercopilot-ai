@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     ALLOWED_ORIGINS_STR: str = "http://localhost:3000"
 
     # Database
-    DATABASE_URL: str = "postgresql://postgres:password@db.supabase.co:5432/postgres"
+    DATABASE_URL: str = "postgresql://postgres:password@db.supabase.co:5432/postgres?sslmode=require"
 
     # Supabase Connection
     SUPABASE_URL: str = "https://vqkrotdvxrfomjcpuoby.supabase.co"
