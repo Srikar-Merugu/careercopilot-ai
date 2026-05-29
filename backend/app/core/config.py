@@ -88,8 +88,8 @@ class Settings(BaseSettings):
     REDIS_URL: str = ""
 
     # Production URLs
-    FRONTEND_URL: str = "https://careercopilot.ai"
-    BACKEND_URL: str = "https://api.careercopilot.ai"
+    FRONTEND_URL: str = "https://careercopilot-frontend.vercel.app"
+    BACKEND_URL: str = "https://careercopilot-api.onrender.com"
 
 
 settings = Settings()
