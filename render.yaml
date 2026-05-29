@@ -2,11 +2,11 @@ services:
   - type: web
     name: careercopilot-api
     env: python
-    buildCommand: pip install -r backend/requirements.txt
-    startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt && playwright install chromium
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT --workers 4 --limit-concurrency 100 --timeout-keep-alive 30
+    healthCheckPath: /api/v1/health
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.14.0
       - key: ENVIRONMENT
         value: production
       - key: LOG_LEVEL
@@ -19,8 +19,51 @@ services:
         sync: false
       - key: SUPABASE_ANON_KEY
         sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+      - key: REDIS_URL
+        sync: false
       - key: ALLOWED_ORIGINS_STR
-        value: "https://careercopilot-frontend.vercel.app,http://localhost:3000"
-    healthCheckPath: /api/v1/health
+        value: "https://careercopilot-ai-pi.vercel.app,http://localhost:3000"
+    autoDeploy: true
     region: oregon
     plan: free
+
+  - type: worker
+    name: career-copilot-worker
+    env: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt && playwright install chromium
+    startCommand: python -m app.automation.workers.apply_worker
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: REDIS_URL
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+    autoDeploy: true
+    plan: free
+
+  - type: cron
+    name: career-copilot-daily-alerts
+    env: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m app.telegram_bot.bot --send-daily-alerts
+    schedule: "0 8 * * *"
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
