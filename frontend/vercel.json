@@ -2,7 +2,7 @@
   "framework": "nextjs",
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
-  "installCommand": "npm ci",
+  "installCommand": "npm install",
   "regions": ["bom1", "iad1"],
   "headers": [
     {
@@ -41,6 +41,8 @@
   "crons": [],
   "env": {
     "NEXT_PUBLIC_API_URL": "@next_public_api_url",
+    "NEXT_PUBLIC_SUPABASE_URL": "@next_public_supabase_url",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@next_public_supabase_anon_key",
     "NEXT_PUBLIC_SENTRY_DSN": "@next_public_sentry_dsn",
     "NEXT_PUBLIC_POSTHOG_KEY": "@next_public_posthog_key",
     "NEXT_PUBLIC_POSTHOG_HOST": "@next_public_posthog_host",

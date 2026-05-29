@@ -1,0 +1,16 @@
+{
+  "name": "CareerCopilot AI",
+  "short_name": "CareerCopilot",
+  "description": "AI-powered career platform with smart job matching, resume analysis, interview preparation, and automated job applications.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#050816",
+  "theme_color": "#8B5CF6",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

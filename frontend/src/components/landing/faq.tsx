@@ -58,7 +58,7 @@ export function FAQ() {
             return (
               <div 
                 key={idx}
-                className="rounded-xl border border-white/[0.04] bg-[#0b1120]/25 backdrop-blur-md overflow-hidden transition-colors"
+                className="group rounded-xl border border-white/[0.04] bg-[#0b1120]/25 backdrop-blur-md overflow-hidden transition-colors"
               >
                 <button
                   onClick={() => toggle(idx)}

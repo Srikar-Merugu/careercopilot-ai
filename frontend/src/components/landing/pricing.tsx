@@ -137,7 +137,7 @@ export function Pricing() {
               return (
                 <div key={bidx} className="flex flex-col items-center lg:items-start text-center lg:text-left space-y-2.5 max-w-[200px] mx-auto lg:mx-0">
                   <div className="h-9 w-9 rounded bg-white/[0.02] border border-white/[0.06] flex items-center justify-center text-[#8B5CF6]">
-                    <Icon className="h-4.5 w-4.5" />
+                    <Icon className="h-[18px] w-[18px]" />
                   </div>
                   <div className="space-y-1">
                     <h5 className="text-[11px] font-bold text-white uppercase tracking-wide leading-none">{ben.title}</h5>

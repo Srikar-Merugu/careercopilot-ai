@@ -10,7 +10,6 @@ export function Partners() {
     { name: "Amazon", display: "amazon" },
     { name: "Indeed", display: "indeed" },
     { name: "LinkedIn", display: "Linked In" },
-    { name: "Amazon2", display: "amazon" }
   ];
 
   return (
