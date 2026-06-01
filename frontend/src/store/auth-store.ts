@@ -213,7 +213,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { token } = get();
 
       if (token) {
-        const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        const isClient = typeof window !== "undefined";
+        const apiBase = isClient ? "/api/v1" : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000");
         const res = await fetch(`${apiBase}/users/onboarding`, {
           method: "POST",
           headers: {

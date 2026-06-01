@@ -38,5 +38,8 @@
   "redirects": [
     { "source": "/dashboard", "destination": "/dashboard", "permanent": true }
   ],
+  "rewrites": [
+    { "source": "/api/v1/:path*", "destination": "https://careercopilot-ai-08iy.onrender.com/api/v1/:path*" }
+  ],
   "crons": []
 }
