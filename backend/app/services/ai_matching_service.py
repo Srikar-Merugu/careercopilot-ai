@@ -18,6 +18,7 @@ class MatchResult:
 class AIMatchingService:
     def __init__(self):
         self.openai_key = settings.OPENAI_API_KEY
+        self.openrouter_key = settings.OPENROUTER_API_KEY
 
     def calculate_match(
         self,
@@ -29,30 +30,31 @@ class AIMatchingService:
         user_projects: list[dict] | None = None,
         ats_score: float | None = None,
     ) -> MatchResult:
-        result = MatchResult()
-
         if self.openai_key:
             try:
-                return self._match_with_ai(
+                return self._match_with_openai(
                     job_skills, job_description, job_title,
                     user_skills, user_experience, user_projects, ats_score,
                 )
             except Exception as e:
-                logger.warning(f"AI matching failed, using local: {e}")
+                logger.warning(f"OpenAI matching failed: {e}")
+
+        if self.openrouter_key:
+            try:
+                return self._match_with_openrouter(
+                    job_skills, job_description, job_title,
+                    user_skills, user_experience, user_projects, ats_score,
+                )
+            except Exception as e:
+                logger.warning(f"OpenRouter matching failed: {e}")
 
         return self._match_local(
             job_skills, job_description, job_title,
             user_skills, ats_score,
         )
 
-    def _match_with_ai(
-        self, job_skills, job_desc, job_title,
-        user_skills, user_exp, user_projects, ats_score,
-    ) -> MatchResult:
-        import openai
-        openai.api_key = self.openai_key
-
-        prompt = f"""You are an expert technical recruiter and career coach. Analyze how well this candidate matches this job.
+    def _build_prompt(self, job_title, job_skills, job_desc, user_skills, ats_score) -> str:
+        return f"""You are an expert technical recruiter and career coach. Analyze how well this candidate matches this job.
 
 Job Title: {job_title}
 Job Skills Required: {', '.join(job_skills)}
@@ -70,17 +72,7 @@ Return ONLY valid JSON with this exact structure:
   "ai_feedback": "Short paragraph about the match quality"
 }}"""
 
-        response = openai.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": "You are an expert job matcher. Return only valid JSON."},
-                {"role": "user", "content": prompt},
-            ],
-            temperature=0.2,
-            max_tokens=1000,
-        )
-
-        content = response.choices[0].message.content.strip()
+    def _parse_ai_response(self, content: str, job_skills, job_desc, job_title, user_skills, ats_score) -> MatchResult:
         import json
         if content.startswith("```"):
             content = content.strip("`")
@@ -99,6 +91,47 @@ Return ONLY valid JSON with this exact structure:
             return result
         except json.JSONDecodeError:
             return self._match_local(job_skills, job_desc, job_title, user_skills, ats_score)
+
+    def _match_with_openai(
+        self, job_skills, job_desc, job_title,
+        user_skills, user_exp, user_projects, ats_score,
+    ) -> MatchResult:
+        import openai
+        openai.api_key = self.openai_key
+
+        response = openai.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "You are an expert job matcher. Return only valid JSON."},
+                {"role": "user", "content": self._build_prompt(job_title, job_skills, job_desc, user_skills, ats_score)},
+            ],
+            temperature=0.2,
+            max_tokens=1000,
+        )
+
+        content = response.choices[0].message.content.strip()
+        return self._parse_ai_response(content, job_skills, job_desc, job_title, user_skills, ats_score)
+
+    def _match_with_openrouter(
+        self, job_skills, job_desc, job_title,
+        user_skills, user_exp, user_projects, ats_score,
+    ) -> MatchResult:
+        import openai
+        openai.api_key = self.openrouter_key
+        openai.base_url = "https://openrouter.ai/api/v1"
+
+        response = openai.chat.completions.create(
+            model="openai/gpt-4o",
+            messages=[
+                {"role": "system", "content": "You are an expert job matcher. Return only valid JSON."},
+                {"role": "user", "content": self._build_prompt(job_title, job_skills, job_desc, user_skills, ats_score)},
+            ],
+            temperature=0.2,
+            max_tokens=1000,
+        )
+
+        content = response.choices[0].message.content.strip()
+        return self._parse_ai_response(content, job_skills, job_desc, job_title, user_skills, ats_score)
 
     def _match_local(
         self,
