@@ -378,17 +378,19 @@ function JobDetailPreview({
         </div>
       ) : matchData ? (
         <div className="space-y-3">
-          <div className="flex items-center gap-3 p-3 rounded-lg bg-[#0b1120]/60 border border-white/5">
-            <MatchScore score={matchData.match_score} size="md" />
-            <div>
-              <p className="text-xs text-white font-semibold">
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-[#0b1120]/60 border border-white/5">
+            <MatchScore score={matchData.match_score} size="md" showLabel={false} />
+            <div className="flex flex-col min-w-0">
+              <p className="text-sm font-semibold leading-tight" style={{
+                color: matchData.match_score >= 80 ? "#22C55E" : matchData.match_score >= 60 ? "#7C3AED" : matchData.match_score >= 40 ? "#F97316" : "#EF4444"
+              }}>
                 {matchData.match_score >= 80
                   ? "Strong Match"
                   : matchData.match_score >= 60
                     ? "Good Match"
                     : "Fair Match"}
               </p>
-              <p className="text-[10px] text-muted-foreground">
+              <p className="text-[11px] text-muted-foreground mt-0.5">
                 {matchData.matched_skills.length} skills matched
               </p>
             </div>

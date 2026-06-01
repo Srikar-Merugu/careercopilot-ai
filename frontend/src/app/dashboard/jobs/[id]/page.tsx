@@ -275,21 +275,22 @@ export default function JobDetailPage() {
                 </div>
               ) : matchData ? (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-center py-2">
+                  <div className="flex flex-col items-center gap-3 py-2">
                     <MatchScore score={matchData.match_score} size="lg" showLabel={false} />
-                  </div>
-
-                  <div className="text-center">
-                    <p className="text-sm font-semibold text-white">
-                      {matchData.match_score >= 80
-                        ? "Strong Match"
-                        : matchData.match_score >= 60
-                          ? "Good Match"
-                          : "Fair Match"}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">
-                      {matchData.matched_skills.length} of {matchData.matched_skills.length + matchData.missing_skills.length} skills matched
-                    </p>
+                    <div className="text-center">
+                      <p className="text-sm font-semibold" style={{
+                        color: matchData.match_score >= 80 ? "#22C55E" : matchData.match_score >= 60 ? "#7C3AED" : matchData.match_score >= 40 ? "#F97316" : "#EF4444"
+                      }}>
+                        {matchData.match_score >= 80
+                          ? "Strong Match"
+                          : matchData.match_score >= 60
+                            ? "Good Match"
+                            : "Fair Match"}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        {matchData.matched_skills.length} of {matchData.matched_skills.length + matchData.missing_skills.length} skills matched
+                      </p>
+                    </div>
                   </div>
 
                   {matchData.ai_feedback && (

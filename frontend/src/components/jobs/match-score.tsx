@@ -1,7 +1,13 @@
 "use client";
 
-import React from "react";
 import { motion } from "framer-motion";
+
+const scoreMeta = (s: number) => {
+  if (s >= 80) return { color: "#22C55E", label: "Strong Match" };
+  if (s >= 60) return { color: "#7C3AED", label: "Good Match" };
+  if (s >= 40) return { color: "#F97316", label: "Fair Match" };
+  return { color: "#EF4444", label: "Low Match" };
+};
 
 interface MatchScoreProps {
   score: number;
@@ -10,100 +16,138 @@ interface MatchScoreProps {
 }
 
 export function MatchScore({ score, size = "md", showLabel = true }: MatchScoreProps) {
-  const dimensions = { sm: 40, md: 56, lg: 80 };
-  const strokeWidth = { sm: 3, md: 4, lg: 6 };
-  const fontSize = { sm: 8, md: 12, lg: 18 };
-
-  const d = dimensions[size];
-  const sw = strokeWidth[size];
-  const fs = fontSize[size];
-  const r = (d - sw) / 2;
+  const dims = { sm: 44, md: 64, lg: 96 };
+  const sw = { sm: 4, md: 5, lg: 7 };
+  const d = dims[size];
+  const strokeW = sw[size];
+  const r = (d - strokeW) / 2;
   const c = 2 * Math.PI * r;
-  const offset = c - (score / 100) * c;
+  const clamped = Math.max(0, Math.min(100, score));
+  const offset = c - (clamped / 100) * c;
+  const meta = scoreMeta(clamped);
 
-  const getColor = (s: number) => {
-    if (s >= 80) return "#22C55E";
-    if (s >= 60) return "#EAB308";
-    if (s >= 40) return "#F97316";
-    return "#EF4444";
-  };
+  const fontSize = size === "lg" ? 22 : size === "md" ? 16 : 12;
 
-  const color = getColor(score);
+  if (!showLabel) {
+    return (
+      <div className="relative inline-flex items-center justify-center flex-shrink-0" style={{ width: d, height: d }}>
+        <svg width={d} height={d} className="transform -rotate-90">
+          <defs>
+            <filter id={`match-glow-${clamped}-${size}`}>
+              <feGaussianBlur stdDeviation="2.5" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+          <circle cx={d / 2} cy={d / 2} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={strokeW} />
+          <motion.circle
+            cx={d / 2}
+            cy={d / 2}
+            r={r}
+            fill="none"
+            stroke={meta.color}
+            strokeWidth={strokeW}
+            strokeLinecap="round"
+            strokeDasharray={c}
+            initial={{ strokeDashoffset: c }}
+            animate={{ strokeDashoffset: offset }}
+            transition={{ duration: 1.5, ease: "easeOut" }}
+            filter={`url(#match-glow-${clamped}-${size})`}
+          />
+        </svg>
+        <svg width={d} height={d} className="absolute inset-0 pointer-events-none">
+          <text
+            x="50%"
+            y="50%"
+            textAnchor="middle"
+            dominantBaseline="central"
+            fill={meta.color}
+            fontSize={fontSize}
+            fontWeight={700}
+            fontFamily="inherit"
+            letterSpacing="-0.02em"
+          >
+            {Math.round(clamped)}%
+          </text>
+        </svg>
+      </div>
+    );
+  }
 
   return (
-    <div className="relative inline-flex items-center justify-center">
-      <svg width={d} height={d} className="transform -rotate-90">
-        <circle
-          cx={d / 2}
-          cy={d / 2}
-          r={r}
-          fill="none"
-          stroke="rgba(255,255,255,0.06)"
-          strokeWidth={sw}
-        />
-        <motion.circle
-          cx={d / 2}
-          cy={d / 2}
-          r={r}
-          fill="none"
-          stroke={color}
-          strokeWidth={sw}
-          strokeLinecap="round"
-          strokeDasharray={c}
-          initial={{ strokeDashoffset: c }}
-          animate={{ strokeDashoffset: offset }}
-          transition={{ duration: 1.5, ease: "easeOut" }}
-        />
-      </svg>
-      <div className="absolute inset-0 flex items-center justify-center">
-        <span
-          className="font-bold font-display leading-none"
-          style={{ fontSize: fs, color }}
+    <div className="flex items-center gap-3">
+      <div className="relative inline-flex items-center justify-center flex-shrink-0" style={{ width: d, height: d }}>
+        <svg width={d} height={d} className="transform -rotate-90">
+          <defs>
+            <filter id={`match-glow-${clamped}-${size}`}>
+              <feGaussianBlur stdDeviation="2.5" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+          <circle cx={d / 2} cy={d / 2} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={strokeW} />
+          <motion.circle
+            cx={d / 2}
+            cy={d / 2}
+            r={r}
+            fill="none"
+            stroke={meta.color}
+            strokeWidth={strokeW}
+            strokeLinecap="round"
+            strokeDasharray={c}
+            initial={{ strokeDashoffset: c }}
+            animate={{ strokeDashoffset: offset }}
+            transition={{ duration: 1.5, ease: "easeOut" }}
+            filter={`url(#match-glow-${clamped}-${size})`}
+          />
+        </svg>
+        <svg width={d} height={d} className="absolute inset-0 pointer-events-none">
+          <text
+            x="50%"
+            y="50%"
+            textAnchor="middle"
+            dominantBaseline="central"
+            fill={meta.color}
+            fontSize={fontSize}
+            fontWeight={700}
+            fontFamily="inherit"
+            letterSpacing="-0.02em"
+          >
+            {Math.round(clamped)}%
+          </text>
+        </svg>
+      </div>
+      <div className="flex flex-col min-w-0">
+        <motion.span
+          className="text-sm font-semibold leading-tight"
+          style={{ color: meta.color }}
+          initial={{ opacity: 0, x: -6 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.4, delay: 0.25 }}
         >
-          {Math.round(score)}%
+          {meta.label}
+        </motion.span>
+        <span className="text-[11px] text-muted-foreground mt-0.5">
+          {Math.round(clamped)}% match
         </span>
       </div>
-      {showLabel && size !== "sm" && (
-        <div className="ml-2">
-          <span className="text-xs font-semibold text-white">{Math.round(score)}%</span>
-          <div
-            className="text-[10px]"
-            style={{
-              color:
-                score >= 80
-                  ? "#22C55E"
-                  : score >= 60
-                    ? "#EAB308"
-                    : score >= 40
-                      ? "#F97316"
-                      : "#EF4444",
-            }}
-          >
-            {score >= 80 ? "Strong Match" : score >= 60 ? "Good Match" : score >= 40 ? "Fair" : "Low"}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
 export function MatchBadge({ score }: { score: number }) {
-  const getColor = (s: number) => {
-    if (s >= 80)
-      return { bg: "bg-emerald-500/15", text: "text-emerald-400", border: "border-emerald-500/25" };
-    if (s >= 60)
-      return { bg: "bg-amber-500/15", text: "text-amber-400", border: "border-amber-500/25" };
-    if (s >= 40)
-      return { bg: "bg-orange-500/15", text: "text-orange-400", border: "border-orange-500/25" };
-    return { bg: "bg-red-500/15", text: "text-red-400", border: "border-red-500/25" };
-  };
-
-  const c = getColor(score);
+  const cls =
+    score >= 80 ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/25"
+    : score >= 60 ? "bg-amber-500/15 text-amber-400 border-amber-500/25"
+    : score >= 40 ? "bg-orange-500/15 text-orange-400 border-orange-500/25"
+    : "bg-red-500/15 text-red-400 border-red-500/25";
 
   return (
-    <span
-      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${c.bg} ${c.text} ${c.border}`}
-    >
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border ${cls}`}>
       {Math.round(score)}% Match
     </span>
   );
