@@ -635,7 +635,7 @@ export default function OnboardingPage() {
                   </div>
 
                   <div className="flex flex-wrap gap-2 justify-center">
-                    {LOCATIONS.map((loc) => (
+                    {LOCATIONS.slice(0, 6).map((loc) => (
                       <PillToggle
                         key={loc}
                         label={loc}
@@ -650,24 +650,53 @@ export default function OnboardingPage() {
                   </div>
 
                   {selectedLocations.length > 0 && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="flex flex-wrap gap-1.5 justify-center"
-                    >
-                      {selectedLocations.map((loc) => (
-                        <span
-                          key={loc}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#06B6D4]/10 border border-[#06B6D4]/25 text-[10px] text-[#06B6D4] font-semibold"
-                        >
-                          <MapPin className="h-2.5 w-2.5" />
-                          {loc}
-                          <button onClick={() => toggleLocation(loc)}>
-                            <X className="h-2.5 w-2.5 ml-0.5 hover:text-white" />
-                          </button>
-                        </span>
-                      ))}
-                    </motion.div>
+                    <>
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex flex-wrap gap-1.5 justify-center"
+                      >
+                        {selectedLocations.map((loc) => (
+                          <span
+                            key={loc}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#06B6D4]/10 border border-[#06B6D4]/25 text-[10px] text-[#06B6D4] font-semibold"
+                          >
+                            <MapPin className="h-2.5 w-2.5" />
+                            {loc}
+                            <button onClick={() => toggleLocation(loc)}>
+                              <X className="h-2.5 w-2.5 ml-0.5 hover:text-white" />
+                            </button>
+                          </span>
+                        ))}
+                      </motion.div>
+
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        transition={{ duration: 0.4, ease: "easeOut" }}
+                        className="overflow-hidden"
+                      >
+                        <div className="border-t border-white/[0.06] pt-5 space-y-3">
+                          <p className="text-[10px] text-[#a0aec0] uppercase tracking-wider font-mono text-center">
+                            More locations
+                          </p>
+                          <div className="flex flex-wrap gap-2 justify-center">
+                            {LOCATIONS.slice(6).map((loc) => (
+                              <PillToggle
+                                key={loc}
+                                label={loc}
+                                selected={selectedLocations.includes(loc)}
+                                onClick={() => {
+                                  if (selectedLocations.includes(loc)) toggleLocation(loc);
+                                  else if (selectedLocations.length < 5) toggleLocation(loc);
+                                  else toast("Limit Reached", "Select up to 5 locations.", "info");
+                                }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      </motion.div>
+                    </>
                   )}
                 </div>
               )}
