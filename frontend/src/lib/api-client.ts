@@ -1,5 +1,7 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
+const TIMEOUT_MS = 15000;
+
 interface ApiOptions {
   method?: string;
   body?: unknown;
@@ -11,22 +13,45 @@ async function request<T>(endpoint: string, options: ApiOptions = {}): Promise<T
 
   const token = typeof window !== "undefined" ? localStorage.getItem("cc_token") : null;
 
-  const res = await fetch(`${API_BASE}${endpoint}`, {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...headers,
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
-  if (!res.ok) {
-    const error = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(error.detail || error.message || `Request failed: ${res.status}`);
+  try {
+    console.log(`[API] ${method} ${API_BASE}${endpoint}`, body || "");
+
+    const res = await fetch(`${API_BASE}${endpoint}`, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...headers,
+      },
+      body: body ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ detail: res.statusText }));
+      console.error(`[API] Error ${res.status}:`, error);
+      const msg = error.detail
+        || error.error?.message
+        || error.message
+        || `Request failed: ${res.status}`;
+      throw new Error(msg);
+    }
+
+    const data = await res.json();
+    console.log(`[API] Response:`, data);
+    return data as T;
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err.name === "AbortError") {
+      throw new Error("Server timeout. Please try again.");
+    }
+    throw err;
   }
-
-  return res.json();
 }
 
 export const api = {

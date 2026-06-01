@@ -33,7 +33,7 @@ services:
       - key: REDIS_URL
         sync: false
       - key: ALLOWED_ORIGINS_STR
-        value: https://careercopilot-frontend.vercel.app,https://www.careercopilot.ai
+        sync: false
     autoDeploy: true
     numInstances: 1
     plan: starter

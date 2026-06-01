@@ -98,7 +98,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   signUp: async (email, pass, name) => {
     set({ isLoading: true });
     try {
+      console.log("[Auth] signUp called", { email, name });
       const data = await authApi.register(name, email, pass);
+      console.log("[Auth] signUp success", data);
 
       localStorage.setItem("cc_token", data.access_token);
       if (typeof window !== "undefined") {
@@ -120,7 +122,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
 
       return data;
+    } catch (err: any) {
+      console.error("[Auth] signUp error:", err);
+      throw err;
     } finally {
+      console.log("[Auth] signUp finally - setting loading false");
       set({ isLoading: false });
     }
   },
@@ -128,7 +134,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   login: async (email, pass) => {
     set({ isLoading: true });
     try {
+      console.log("[Auth] login called", { email });
       const data = await authApi.login(email, pass);
+      console.log("[Auth] login success", data);
 
       localStorage.setItem("cc_token", data.access_token);
       if (typeof window !== "undefined") {
@@ -151,6 +159,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
 
       return data;
+    } catch (err: any) {
+      console.error("[Auth] login error:", err);
+      throw err;
     } finally {
       set({ isLoading: false });
     }
@@ -203,7 +214,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       if (token) {
         const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-        await fetch(`${apiBase}/users/onboarding`, {
+        const res = await fetch(`${apiBase}/users/onboarding`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -211,12 +222,35 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           },
           body: JSON.stringify(data),
         });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({ detail: "Onboarding failed" }));
+          throw new Error(errData.detail || errData.message || "Onboarding failed");
+        }
+
+        const resData = await res.json();
+        if (resData.data) {
+          const ud = resData.data;
+          set({
+            user: {
+              id: ud.id,
+              name: ud.name,
+              email: ud.email,
+              role: ud.role,
+              headline: ud.headline,
+              bio: ud.bio,
+            },
+          });
+        }
       }
 
       set({
         onboardingComplete: true,
         onboardingData: data,
       });
+    } catch (err: any) {
+      console.error("[Auth] completeOnboarding error:", err);
+      throw err;
     } finally {
       set({ isLoading: false });
     }

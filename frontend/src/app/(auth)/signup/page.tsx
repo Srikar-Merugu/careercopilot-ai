@@ -62,10 +62,13 @@ export default function SignupPage() {
   }, [watchedPassword]);
 
   const handleCredentialsSignUp = async (data: SignUpInput) => {
+    console.log("[Signup] handleCredentialsSignUp called", { email: data.email, name: data.name });
     setAuthError(null);
     try {
       const result = await signUp(data.email, data.password, data.name);
-      if (result?.session) {
+      console.log("[Signup] signUp returned", result);
+
+      if (result?.access_token) {
         toast("Portfolio Orchestrated", "Welcome aboard, captain.", "success");
         router.push("/onboarding");
       } else {
@@ -77,7 +80,7 @@ export default function SignupPage() {
         router.push("/verify-email");
       }
     } catch (err: any) {
-      console.error(err);
+      console.error("[Signup] Error:", err);
       const msg = err.message || "Registration failed. Please check inputs.";
       setAuthError(msg);
       toast("Sign Up Failed", msg, "error");

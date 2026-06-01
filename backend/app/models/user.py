@@ -1,11 +1,11 @@
-import uuid
 from datetime import datetime
 from beanie import Document
 from pydantic import Field
+from pymongo import IndexModel, ASCENDING
 
 
 class UserModel(Document):
-    email: str = Field(..., index=True, unique=True)
+    email: str = Field(...)
     hashed_password: str = Field(...)
     name: str = Field(default="")
     headline: str = Field(default="AI Career Builder")
@@ -44,3 +44,6 @@ class UserModel(Document):
 
     class Settings:
         name = "users"
+        indexes = [
+            IndexModel([("email", ASCENDING)], unique=True),
+        ]

@@ -19,10 +19,9 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  if (isAuthRoute && sessionToken) {
-    // Authenticated request attempting to visit credential forms
-    return NextResponse.redirect(new URL("/dashboard", request.url));
-  }
+  // Do NOT redirect auth routes here — client-side initializeSession() handles
+  // redirecting authenticated users away from login/signup. This avoids a
+  // redirect loop when the cookie exists but the JWT token is expired/invalid.
 
   return NextResponse.next();
 }
