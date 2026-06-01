@@ -22,7 +22,8 @@ import {
 } from "lucide-react";
 import { useCareerInsight, useRecommendations, useTrendingSkills } from "@/hooks/use-ai";
 import { useAIStore } from "@/store/ai-store";
-import { useResumeStore } from "@/store/resume-store";
+import { useResumeStore, ResumeAnalysis } from "@/store/resume-store";
+import { CareerInsight } from "@/services/ai-service";
 import { resumeService } from "@/services/resume-service";
 import { useToast } from "@/providers/toast-provider";
 import { CareerRadarChart } from "@/components/ai/career-radar-chart";
@@ -64,6 +65,25 @@ export default function CareerInsightsPage() {
   const [uploadingFile, setUploadingFile] = useState(false);
   const [dragOver, setDragOver] = useState(false);
 
+  const analysisToInsight = useCallback((a: ResumeAnalysis): CareerInsight => ({
+    id: crypto.randomUUID?.() || `ci_${Date.now()}`,
+    strengths: a.strengths || [],
+    weaknesses: a.weaknesses || [],
+    missing_skills: a.missing_skills || [],
+    recommendations: a.optimization_tips?.slice(0, 8) || [
+      "Take a System Design course to prepare for senior-level interviews",
+      "Build a portfolio of open-source contributions to demonstrate expertise",
+      "Network with industry professionals and attend tech conferences",
+    ],
+    career_paths: (a.recommended_roles || []).map(r => ({
+      role: r.title,
+      match: r.match_percentage,
+      growth: r.reason || "Advance to senior roles",
+    })),
+    ai_summary: a.career_suggestions || "Career analysis complete.",
+    confidence_score: (a.ats_score || 70) / 100,
+  }), []);
+
   const handleUpload = useCallback(async (file: File) => {
     const validTypes = [
       "application/pdf",
@@ -84,6 +104,7 @@ export default function CareerInsightsPage() {
       const analysisResult = await resumeService.analyze(uploaded.id);
       if (analysisResult.success) {
         useResumeStore.getState().setCurrentAnalysis(analysisResult.data);
+        useAIStore.getState().setCareerInsight(analysisToInsight(analysisResult.data));
         toast("Resume Analyzed", "AI analysis complete. Insights updated.", "success");
       } else {
         toast("Analysis Failed", "Could not parse resume content. Try a different file.", "error");
@@ -93,7 +114,7 @@ export default function CareerInsightsPage() {
     } finally {
       setUploadingFile(false);
     }
-  }, [toast]);
+  }, [toast, analysisToInsight]);
 
   return (
     <div className="min-h-screen space-y-6 pb-12">
