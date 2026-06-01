@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useDashboardAnalytics, useApplications, useActivityLog } from "@/hooks/use-dashboard";
 import { useDashboardStore } from "@/store/dashboard-store";
+import { useAuthStore } from "@/store/auth-store";
 
 const statCards = [
   { key: "total_applications", label: "Total Applications", icon: Briefcase, color: "text-primary", bg: "bg-primary/10", border: "border-primary/20", prefix: "" },
@@ -44,6 +45,7 @@ const activityIcons: Record<string, any> = {
 
 export default function DashboardPage() {
   const { analytics, activityLog, isLoading } = useDashboardStore();
+  const { user } = useAuthStore();
   useDashboardAnalytics();
   useApplications();
   useActivityLog(8);
@@ -63,7 +65,7 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-2.5">
             <Activity className="h-6 w-6 text-primary" />
-            Dashboard
+            {user?.name ? `Welcome back, ${user.name.split(" ")[0]}` : "Dashboard"}
           </h1>
           <p className="text-sm text-[#a0aec0] mt-0.5">Your AI-powered career command center</p>
         </div>
