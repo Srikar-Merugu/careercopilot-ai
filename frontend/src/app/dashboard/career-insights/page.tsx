@@ -19,7 +19,6 @@ import {
   Upload,
   Check,
   X,
-  Loader2,
 } from "lucide-react";
 import { useCareerInsight, useRecommendations, useTrendingSkills } from "@/hooks/use-ai";
 import { useAIStore } from "@/store/ai-store";
@@ -86,6 +85,8 @@ export default function CareerInsightsPage() {
       if (analysisResult.success) {
         useResumeStore.getState().setCurrentAnalysis(analysisResult.data);
         toast("Resume Analyzed", "AI analysis complete. Insights updated.", "success");
+      } else {
+        toast("Analysis Failed", "Could not parse resume content. Try a different file.", "error");
       }
     } catch (err: any) {
       toast("Upload Failed", err?.error?.message || "Could not upload resume.", "error");
@@ -186,11 +187,13 @@ export default function CareerInsightsPage() {
               })}
             </div>
 
-            {isLoading || insightLoading ? (
+            {isLoading || insightLoading || uploadingFile ? (
               <div className="flex items-center justify-center py-20">
                 <div className="flex flex-col items-center gap-3">
                   <div className="h-12 w-12 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-                  <p className="text-sm text-[#a0aec0]">AI analyzing your career profile...</p>
+                  <p className="text-sm text-[#a0aec0]">
+                    {uploadingFile ? "Analyzing your resume..." : "AI analyzing your career profile..."}
+                  </p>
                 </div>
               </div>
             ) : careerInsight ? (
@@ -376,27 +379,18 @@ export default function CareerInsightsPage() {
                   input.click();
                 }}
               >
-                {uploadingFile ? (
-                  <div className="flex flex-col items-center gap-3">
-                    <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                    <p className="text-sm text-[#a0aec0]">Analyzing your resume...</p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="h-14 w-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-4">
-                      <Upload className="h-7 w-7 text-primary" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-white mb-2">Upload Your Resume</h3>
-                    <p className="text-sm text-[#a0aec0] max-w-md mx-auto mb-4">
-                      Drop your PDF or DOCX here, or click to browse. Your AI will analyze your skills,
-                      experience, and generate personalized career insights.
-                    </p>
-                    <span className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-white text-sm font-medium transition-all">
-                      <Upload className="h-4 w-4" />
-                      Choose File
-                    </span>
-                  </>
-                )}
+                <div className="h-14 w-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-4">
+                  <Upload className="h-7 w-7 text-primary" />
+                </div>
+                <h3 className="text-lg font-semibold text-white mb-2">Upload Your Resume</h3>
+                <p className="text-sm text-[#a0aec0] max-w-md mx-auto mb-4">
+                  Drop your PDF or DOCX here, or click to browse. Your AI will analyze your skills,
+                  experience, and generate personalized career insights.
+                </p>
+                <span className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-white text-sm font-medium transition-all">
+                  <Upload className="h-4 w-4" />
+                  Choose File
+                </span>
               </div>
             )}
           </motion.div>

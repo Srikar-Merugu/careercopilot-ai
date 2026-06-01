@@ -65,8 +65,8 @@ class CareerInsightResponse(BaseModel):
     career_paths: List[Dict[str, Any]]
     ai_summary: str
     confidence_score: float
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
 
 class RecommendationItem(BaseModel):
