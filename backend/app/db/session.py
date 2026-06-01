@@ -40,8 +40,10 @@ async def init_db():
                 "backend.app.models.telegram.BotActivity",
                 "backend.app.models.automation.AutoApplication",
                 "backend.app.models.automation.CoverLetter",
-                "backend.app.models.automation.AutomationQueue",
+                "backend.app.models.automation.AutomationQueueItem",
                 "backend.app.models.automation.AutomationSession",
+                "backend.app.models.automation.AutomationPipeline",
+                "backend.app.models.automation.AutomationSettings",
             ],
         )
         logger.info("Beanie document models registered successfully.")

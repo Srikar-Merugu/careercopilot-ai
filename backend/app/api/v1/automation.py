@@ -413,9 +413,9 @@ async def _run_pipeline(pipeline: AutomationPipeline, settings: AutomationSettin
 @router.get("/pipeline/status", response_model=PipelineStartResponse)
 async def get_pipeline_status(current_user: dict = Depends(get_current_user)):
     user_id = current_user.get("id")
-    pipeline = await AutomationPipeline.find_one(
-        AutomationPipeline.user_id == user_id
-    ).sort(-AutomationPipeline.created_at).limit(1)
+    pipeline = await AutomationPipeline.find(
+        AutomationPipeline.user_id == user_id,
+    ).sort(-AutomationPipeline.created_at).limit(1).first_or_none()
 
     if not pipeline:
         return PipelineStartResponse(ok=False, message="No pipeline found", pipeline_id="")
