@@ -32,6 +32,7 @@ class Settings(BaseSettings):
 
     # CORS Allowed Origins (comma-separated in env, parsed to list)
     ALLOWED_ORIGINS_STR: str = "http://localhost:3000"
+    ALLOWED_ORIGINS_REGEX: str = r"https://.*\.vercel\.app"
 
     # MongoDB
     MONGODB_URL: str = "mongodb://localhost:27017"
