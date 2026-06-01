@@ -712,7 +712,7 @@ export default function OnboardingPage() {
                   </div>
 
                   <div className="flex flex-wrap gap-2 justify-center">
-                    {SKILLS.map((skill) => (
+                    {SKILLS.slice(0, 10).map((skill) => (
                       <PillToggle
                         key={skill}
                         label={skill}
@@ -728,6 +728,31 @@ export default function OnboardingPage() {
                       {selectedSkills.length < 2 && " · select at least 2"}
                     </span>
                   </div>
+
+                  {selectedSkills.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      transition={{ duration: 0.4, ease: "easeOut" }}
+                      className="overflow-hidden"
+                    >
+                      <div className="border-t border-white/[0.06] pt-5 space-y-3">
+                        <p className="text-[10px] text-[#a0aec0] uppercase tracking-wider font-mono text-center">
+                          More skills
+                        </p>
+                        <div className="flex flex-wrap gap-2 justify-center">
+                          {SKILLS.slice(10).map((skill) => (
+                            <PillToggle
+                              key={skill}
+                              label={skill}
+                              selected={selectedSkills.includes(skill)}
+                              onClick={() => toggleSkill(skill)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
                 </div>
               )}
 
