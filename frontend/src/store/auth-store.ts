@@ -101,26 +101,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       console.log("[Auth] signUp called", { email, name });
       const data = await authApi.register(name, email, pass);
       console.log("[Auth] signUp success", data);
-
-      localStorage.setItem("cc_token", data.access_token);
-      if (typeof window !== "undefined") {
-        document.cookie = `cc_session=${data.access_token}; path=/; max-age=${3600 * 24}; SameSite=Lax; Secure`;
-      }
-
-      const mappedUser: User = {
-        id: data.user.id,
-        name: data.user.name || email.split("@")[0] || "Professional User",
-        email: data.user.email,
-        role: data.user.role,
-        headline: data.user.headline || "AI Career Builder",
-      };
-
-      set({
-        user: mappedUser,
-        token: data.access_token,
-        isAuthenticated: true,
-      });
-
       return data;
     } catch (err: any) {
       console.error("[Auth] signUp error:", err);

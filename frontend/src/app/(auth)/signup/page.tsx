@@ -69,8 +69,8 @@ export default function SignupPage() {
       console.log("[Signup] signUp returned", result);
 
       if (result?.access_token) {
-        toast("Portfolio Orchestrated", "Welcome aboard, captain.", "success");
-        router.push("/onboarding");
+        toast("Portfolio Orchestrated", "Account created! Please log in.", "success");
+        router.push("/login?registered=1");
       } else {
         toast(
           "Verification Email Sent",

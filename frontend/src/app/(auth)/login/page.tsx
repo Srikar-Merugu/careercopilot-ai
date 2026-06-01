@@ -26,6 +26,7 @@ function LoginContent() {
 
   // Read target redirects
   const redirect = searchParams.get("redirect") || "/dashboard";
+  const justRegistered = searchParams.get("registered") === "1";
 
   // Form hooks
   const {
@@ -44,6 +45,13 @@ function LoginContent() {
   useEffect(() => {
     initializeSession();
   }, [initializeSession]);
+
+  // Show welcome message if redirected from registration
+  useEffect(() => {
+    if (justRegistered) {
+      toast("Account Created", "Registration successful! Sign in to continue.", "success");
+    }
+  }, [justRegistered, toast]);
 
   const handleCredentialsLogin = async (data: LoginInput) => {
     setAuthError(null);
