@@ -5,7 +5,7 @@ from backend.app.models.ai import Embedding, CareerInsight, Recommendation, Embe
 from backend.app.models.dashboard import Application, Notification, Subscription, ActivityLog, ApplicationStatus, NotificationType, SubscriptionPlan, SubscriptionStatus
 from backend.app.models.interview import Interview, InterviewQuestion, InterviewFeedback, InterviewType, InterviewStatus
 from backend.app.models.telegram import TelegramUser, TelegramAlert, BotActivity, AlertType
-from backend.app.models.automation import AutoApplication, CoverLetter, AutomationQueue, AutomationSession, ApplicationStatus as AutoAppStatus, AutomationQueueStatus
+from backend.app.models.automation import AutoApplication, CoverLetter, AutomationQueueItem, AutomationSession, AutomationPipeline, ApplicationStatus as AutoAppStatus, AutomationQueueStatus
 
 __all__ = [
     "UserModel",
@@ -16,6 +16,6 @@ __all__ = [
     "ApplicationStatus", "NotificationType", "SubscriptionPlan", "SubscriptionStatus",
     "Interview", "InterviewQuestion", "InterviewFeedback", "InterviewType", "InterviewStatus",
     "TelegramUser", "TelegramAlert", "BotActivity", "AlertType",
-    "AutoApplication", "CoverLetter", "AutomationQueue", "AutomationSession",
+    "AutoApplication", "CoverLetter", "AutomationQueueItem", "AutomationSession", "AutomationPipeline",
     "AutoAppStatus", "AutomationQueueStatus",
 ]
