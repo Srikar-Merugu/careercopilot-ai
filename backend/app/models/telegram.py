@@ -1,8 +1,7 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Text, Boolean, DateTime, JSON, ForeignKey, Enum as SAEnum
-from sqlalchemy.dialects.postgresql import UUID
-from backend.app.db.session import Base
+from beanie import Document
+from pydantic import Field
 import enum
 
 
@@ -16,43 +15,43 @@ class AlertType(str, enum.Enum):
     RESUME_ANALYSIS = "resume_analysis"
 
 
-class TelegramUser(Base):
-    __tablename__ = "telegram_users"
+class TelegramUser(Document):
+    user_id: str = Field(..., index=True, unique=True)
+    telegram_id: str = Field(..., index=True, unique=True)
+    telegram_username: str | None = Field(default=None)
+    first_name: str | None = Field(default=None)
+    last_name: str | None = Field(default=None)
+    is_active: bool = Field(default=True)
+    notifications_enabled: bool = Field(default=True)
+    preferences: dict = Field(default={})
+    last_interaction: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(String(255), nullable=False, unique=True, index=True)
-    telegram_id = Column(String(255), nullable=False, unique=True, index=True)
-    telegram_username = Column(String(255), nullable=True)
-    first_name = Column(String(255), nullable=True)
-    last_name = Column(String(255), nullable=True)
-    is_active = Column(Boolean, default=True, nullable=False)
-    notifications_enabled = Column(Boolean, default=True, nullable=False)
-    preferences = Column(JSON, default=dict, nullable=True)
-    last_interaction = Column(DateTime, default=datetime.utcnow, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-
-
-class TelegramAlert(Base):
-    __tablename__ = "telegram_alerts"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(String(255), nullable=False, index=True)
-    alert_type = Column(SAEnum(AlertType), nullable=False)
-    title = Column(String(500), nullable=False)
-    message = Column(Text, nullable=False)
-    meta_data = Column("metadata", JSON, default=dict, nullable=True)
-    is_sent = Column(Boolean, default=False, nullable=False)
-    sent_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    class Settings:
+        name = "telegram_users"
 
 
-class BotActivity(Base):
-    __tablename__ = "bot_activity"
+class TelegramAlert(Document):
+    user_id: str = Field(..., index=True)
+    alert_type: AlertType = Field(...)
+    title: str = Field(...)
+    message: str = Field(...)
+    meta_data: dict = Field(default={})
+    is_sent: bool = Field(default=False)
+    sent_at: datetime | None = Field(default=None)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(String(255), nullable=False, index=True)
-    action = Column(String(255), nullable=False)
-    meta_data = Column("metadata", JSON, default=dict, nullable=True)
-    ip_address = Column(String(50), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    class Settings:
+        name = "telegram_alerts"
+
+
+class BotActivity(Document):
+    user_id: str = Field(..., index=True)
+    action: str = Field(...)
+    meta_data: dict = Field(default={})
+    ip_address: str | None = Field(default=None)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Settings:
+        name = "bot_activity"

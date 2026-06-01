@@ -18,7 +18,7 @@ import { motion } from "framer-motion";
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login, signInWithOAuth, initializeSession, isLoading } = useAuthStore();
+  const { login, initializeSession, isLoading } = useAuthStore();
   const { toast } = useToast();
   
   const [showPassword, setShowPassword] = useState(false);
@@ -57,18 +57,6 @@ function LoginContent() {
       const msg = err.message || "Invalid credentials. Try again.";
       setAuthError(msg);
       toast("Authentication Failed", msg, "error");
-    }
-  };
-
-  const handleSocialOAuth = async (provider: "google" | "github") => {
-    setAuthError(null);
-    try {
-      await signInWithOAuth(provider);
-      toast("Redirecting...", `Connecting to ${provider} authentication...`, "info");
-    } catch (err: any) {
-      console.error(err);
-      const msg = err.message || "Failed to initialize social sign-in.";
-      toast("OAuth Connection Error", msg, "error");
     }
   };
 
@@ -262,32 +250,6 @@ function LoginContent() {
                     ) : "Log In to Dashboard"}
                   </Button>
                 </form>
-
-                <div className="relative my-4 flex items-center justify-center">
-                  <span className="absolute w-full border-t border-white/5" />
-                  <span className="relative bg-[#0b1120]/10 px-3 text-[10px] uppercase text-muted-foreground tracking-wider backdrop-blur-xl">
-                    Or Social Connect
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <Button 
-                    variant="glass" 
-                    size="sm" 
-                    onClick={() => handleSocialOAuth("google")}
-                    className="text-xs h-9"
-                  >
-                    Google SSO
-                  </Button>
-                  <Button 
-                    variant="glass" 
-                    size="sm" 
-                    onClick={() => handleSocialOAuth("github")}
-                    className="text-xs h-9"
-                  >
-                    GitHub SSO
-                  </Button>
-                </div>
 
               </CardContent>
               <CardFooter className="flex justify-center text-xs border-t border-white/[0.03] pt-4">

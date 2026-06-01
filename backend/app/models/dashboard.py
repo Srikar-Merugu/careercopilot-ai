@@ -1,9 +1,7 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Text, Float, Boolean, DateTime, JSON, ForeignKey, Enum as SAEnum
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
-from backend.app.db.session import Base
+from beanie import Document
+from pydantic import Field
 import enum
 
 
@@ -39,56 +37,56 @@ class SubscriptionStatus(str, enum.Enum):
     TRIAL = "trial"
 
 
-class Application(Base):
-    __tablename__ = "applications"
+class Application(Document):
+    user_id: str = Field(..., index=True)
+    job_id: str | None = Field(default=None)
+    job_title: str = Field(...)
+    company: str = Field(...)
+    location: str | None = Field(default=None)
+    salary_range: str | None = Field(default=None)
+    status: ApplicationStatus = Field(default=ApplicationStatus.SAVED)
+    notes: str | None = Field(default=None)
+    interview_date: datetime | None = Field(default=None)
+    apply_url: str | None = Field(default=None)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(String(255), nullable=False, index=True)
-    job_id = Column(UUID(as_uuid=True), ForeignKey("jobs.id", ondelete="SET NULL"), nullable=True)
-    job_title = Column(String(255), nullable=False)
-    company = Column(String(255), nullable=False)
-    location = Column(String(255), nullable=True)
-    salary_range = Column(String(100), nullable=True)
-    status = Column(SAEnum(ApplicationStatus), nullable=False, default=ApplicationStatus.SAVED)
-    notes = Column(Text, nullable=True)
-    interview_date = Column(DateTime, nullable=True)
-    apply_url = Column(String(500), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-
-
-class Notification(Base):
-    __tablename__ = "notifications"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(String(255), nullable=False, index=True)
-    type = Column(SAEnum(NotificationType), nullable=False)
-    title = Column(String(255), nullable=False)
-    content = Column(Text, nullable=True)
-    meta_data = Column("metadata", JSON, nullable=True, default=dict)
-    is_read = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    class Settings:
+        name = "applications"
 
 
-class Subscription(Base):
-    __tablename__ = "subscriptions"
+class Notification(Document):
+    user_id: str = Field(..., index=True)
+    type: NotificationType = Field(...)
+    title: str = Field(...)
+    content: str | None = Field(default=None)
+    meta_data: dict = Field(default={})
+    is_read: bool = Field(default=False)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(String(255), nullable=False, index=True, unique=True)
-    plan = Column(SAEnum(SubscriptionPlan), nullable=False, default=SubscriptionPlan.FREE)
-    status = Column(SAEnum(SubscriptionStatus), nullable=False, default=SubscriptionStatus.TRIAL)
-    renewal_date = Column(DateTime, nullable=True)
-    features_used = Column(JSON, nullable=True, default=dict)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    class Settings:
+        name = "notifications"
 
 
-class ActivityLog(Base):
-    __tablename__ = "activity_logs"
+class Subscription(Document):
+    user_id: str = Field(..., index=True, unique=True)
+    plan: SubscriptionPlan = Field(default=SubscriptionPlan.FREE)
+    status: SubscriptionStatus = Field(default=SubscriptionStatus.TRIAL)
+    renewal_date: datetime | None = Field(default=None)
+    features_used: dict = Field(default={})
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(String(255), nullable=False, index=True)
-    activity_type = Column(String(100), nullable=False)
-    description = Column(Text, nullable=True)
-    meta_data = Column("metadata", JSON, nullable=True, default=dict)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    class Settings:
+        name = "subscriptions"
+
+
+class ActivityLog(Document):
+    user_id: str = Field(..., index=True)
+    activity_type: str = Field(...)
+    description: str | None = Field(default=None)
+    meta_data: dict = Field(default={})
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Settings:
+        name = "activity_logs"

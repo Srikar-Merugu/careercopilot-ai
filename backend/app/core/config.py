@@ -1,5 +1,5 @@
 from typing import List, Union
-from pydantic import AnyHttpUrl, BeforeValidator, field_validator
+from pydantic import BeforeValidator, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing_extensions import Annotated
 
@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "CareerCopilot AI"
     ENVIRONMENT: str = "development"
     LOG_LEVEL: str = "info"
-    
+
     # Security
     JWT_SECRET_KEY: str = "9a6d09f7a75a7c29e6231c5123d46777c9ff7a12b4e870503f8a96d4c1ff00f9"
     JWT_ALGORITHM: str = "HS256"
@@ -33,20 +33,15 @@ class Settings(BaseSettings):
     # CORS Allowed Origins (comma-separated in env, parsed to list)
     ALLOWED_ORIGINS_STR: str = "http://localhost:3000"
 
-    # Database
-    DATABASE_URL: str = "postgresql://postgres:password@db.supabase.co:5432/postgres?sslmode=require"
-
-    # Supabase Connection
-    SUPABASE_URL: str = "https://vqkrotdvxrfomjcpuoby.supabase.co"
-    SUPABASE_ANON_KEY: str = "sb_publishable_I8l_iL5HyEJt9ZlkwQWN5Q_BjjyKJ44"
-    SUPABASE_SERVICE_ROLE_KEY: str = "your-service-role-key"
+    # MongoDB
+    MONGODB_URL: str = "mongodb://localhost:27017"
+    MONGODB_DB: str = "careercopilot"
 
     # AI Services
     OPENAI_API_KEY: str = ""
     OPENROUTER_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o"
 
-    # Job Providers
     # Job Providers
     ADZUNA_APP_ID: str = ""
     ADZUNA_APP_KEY: str = ""
@@ -76,6 +71,11 @@ class Settings(BaseSettings):
     STRIPE_SECRET_KEY: str = ""
     STRIPE_PUBLISHABLE_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""
+
+    # Supabase Storage (file uploads only)
+    SUPABASE_URL: str = "https://vqkrotdvxrfomjcpuoby.supabase.co"
+    SUPABASE_ANON_KEY: str = "sb_publishable_I8l_iL5HyEJt9ZlkwQWN5Q_BjjyKJ44"
+    SUPABASE_SERVICE_ROLE_KEY: str = ""
 
     # Sentry
     SENTRY_DSN: str = ""

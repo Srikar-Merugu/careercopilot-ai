@@ -1,34 +1,69 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
-from backend.app.core.config import settings
+import asyncio
 import logging
+from motor.motor_asyncio import AsyncIOMotorClient
+from beanie import init_beanie
+from backend.app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Base class for SQLAlchemy ORM models
-Base = declarative_base()
+client: AsyncIOMotorClient | None = None
 
-try:
-    engine = create_engine(
-        settings.DATABASE_URL,
-        pool_pre_ping=True,  # Check connection viability before running queries
-        pool_size=10,
-        max_overflow=20
-    )
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    logger.info("SQLAlchemy database engine initialized successfully.")
-except Exception as e:
-    logger.error(f"SQLAlchemy initialization failed: {str(e)}")
-    # We create a dummy/mock setup for clean startup if connection string is missing during initial build
-    engine = None
-    SessionLocal = None
 
-def get_db():
-    """Dependency generator for database sessions in endpoints"""
-    if SessionLocal is None:
-        raise RuntimeError("Database engine not initialized. Verify DATABASE_URL.")
-    db = SessionLocal()
+async def init_db():
+    global client
     try:
-        yield db
-    finally:
-        db.close()
+        client = AsyncIOMotorClient(settings.MONGODB_URL)
+        await client.admin.command("ping")
+        logger.info("MongoDB connection established successfully.")
+
+        await init_beanie(
+            database=client[settings.MONGODB_DB],
+            document_models=[
+                "backend.app.models.user.UserModel",
+                "backend.app.models.resume.Resume",
+                "backend.app.models.resume.ResumeAnalysis",
+                "backend.app.models.job.Job",
+                "backend.app.models.job.SavedJob",
+                "backend.app.models.job.JobMatch",
+                "backend.app.models.ai.Embedding",
+                "backend.app.models.ai.CareerInsight",
+                "backend.app.models.ai.Recommendation",
+                "backend.app.models.dashboard.Application",
+                "backend.app.models.dashboard.Notification",
+                "backend.app.models.dashboard.Subscription",
+                "backend.app.models.dashboard.ActivityLog",
+                "backend.app.models.interview.Interview",
+                "backend.app.models.interview.InterviewQuestion",
+                "backend.app.models.interview.InterviewFeedback",
+                "backend.app.models.telegram.TelegramUser",
+                "backend.app.models.telegram.TelegramAlert",
+                "backend.app.models.telegram.BotActivity",
+                "backend.app.models.automation.AutoApplication",
+                "backend.app.models.automation.CoverLetter",
+                "backend.app.models.automation.AutomationQueue",
+                "backend.app.models.automation.AutomationSession",
+            ],
+        )
+        logger.info("Beanie document models registered successfully.")
+        return True
+    except Exception as e:
+        logger.error(f"Database initialization failed: {str(e)}")
+        client = None
+        return False
+
+
+async def close_db():
+    global client
+    if client:
+        client.close()
+        logger.info("MongoDB connection closed.")
+
+
+async def get_db_health() -> bool:
+    if not client:
+        return False
+    try:
+        await client.admin.command("ping")
+        return True
+    except Exception:
+        return False

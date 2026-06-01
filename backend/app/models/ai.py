@@ -1,9 +1,7 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Text, Float, Integer, Boolean, DateTime, JSON, ForeignKey, Enum as SAEnum
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
-from backend.app.db.session import Base
+from beanie import Document
+from pydantic import Field
 import enum
 
 
@@ -18,48 +16,48 @@ class EmbeddingType(str, enum.Enum):
     JOB_TITLE = "job_title"
 
 
-class Embedding(Base):
-    __tablename__ = "embeddings"
+class Embedding(Document):
+    user_id: str = Field(..., index=True)
+    vector_id: str = Field(..., index=True)
+    embedding_type: str = Field(...)
+    source_id: str | None = Field(default=None, index=True)
+    dimensions: int = Field(default=1536)
+    meta_data: dict = Field(default={})
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(String(255), nullable=False, index=True)
-    vector_id = Column(String(255), nullable=False, index=True)
-    embedding_type = Column(SAEnum(EmbeddingType), nullable=False)
-    source_id = Column(String(255), nullable=True, index=True)
-    dimensions = Column(Integer, nullable=False, default=1536)
-    meta_data = Column("metadata", JSON, nullable=True, default=dict)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-
-
-class CareerInsight(Base):
-    __tablename__ = "career_insights"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(String(255), nullable=False, index=True)
-    resume_id = Column(UUID(as_uuid=True), ForeignKey("resumes.id", ondelete="CASCADE"), nullable=True)
-    strengths = Column(JSON, nullable=True, default=list)
-    weaknesses = Column(JSON, nullable=True, default=list)
-    missing_skills = Column(JSON, nullable=True, default=list)
-    recommendations = Column(JSON, nullable=True, default=list)
-    career_paths = Column(JSON, nullable=True, default=list)
-    ai_summary = Column(Text, nullable=True)
-    confidence_score = Column(Float, nullable=True, default=0.0)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    class Settings:
+        name = "embeddings"
 
 
-class Recommendation(Base):
-    __tablename__ = "recommendations"
+class CareerInsight(Document):
+    user_id: str = Field(..., index=True)
+    resume_id: str | None = Field(default=None)
+    strengths: list = Field(default=[])
+    weaknesses: list = Field(default=[])
+    missing_skills: list = Field(default=[])
+    recommendations: list = Field(default=[])
+    career_paths: list = Field(default=[])
+    ai_summary: str | None = Field(default=None)
+    confidence_score: float = Field(default=0.0)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(String(255), nullable=False, index=True)
-    recommendation_type = Column(String(100), nullable=False)
-    title = Column(String(255), nullable=False)
-    content = Column(Text, nullable=True)
-    source = Column(String(100), nullable=True)
-    relevance_score = Column(Float, nullable=True, default=0.0)
-    meta_data = Column("metadata", JSON, nullable=True, default=dict)
-    is_read = Column(Boolean, default=False)
-    is_dismissed = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    class Settings:
+        name = "career_insights"
+
+
+class Recommendation(Document):
+    user_id: str = Field(..., index=True)
+    recommendation_type: str = Field(...)
+    title: str = Field(...)
+    content: str | None = Field(default=None)
+    source: str | None = Field(default=None)
+    relevance_score: float = Field(default=0.0)
+    meta_data: dict = Field(default={})
+    is_read: bool = Field(default=False)
+    is_dismissed: bool = Field(default=False)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Settings:
+        name = "recommendations"

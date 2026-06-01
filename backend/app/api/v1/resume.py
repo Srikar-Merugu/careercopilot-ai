@@ -1,9 +1,8 @@
 import logging
 from typing import List
+from datetime import datetime
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status
-from sqlalchemy.orm import Session
 from backend.app.core.security import get_current_user
-from backend.app.db.session import get_db
 from backend.app.models.resume import Resume, ResumeAnalysis
 from backend.app.schemas.resume import (
     ResumeUploadResponse,
@@ -30,7 +29,6 @@ MAX_FILE_SIZE = 10 * 1024 * 1024
 async def upload_resume(
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db),
 ):
     user_id = current_user.get("id")
 
@@ -69,12 +67,10 @@ async def upload_resume(
         file_url=file_url,
         status="uploaded",
     )
-    db.add(resume)
-    db.commit()
-    db.refresh(resume)
+    await resume.insert()
 
     return ResumeUploadResponse(
-        id=resume.id,
+        id=str(resume.id),
         file_name=resume.file_name,
         file_type=resume.file_type,
         file_size=resume.file_size,
@@ -88,15 +84,14 @@ async def upload_resume(
 async def analyze_resume(
     resume_id: str,
     current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db),
 ):
     user_id = current_user.get("id")
-    resume = db.query(Resume).filter(Resume.id == resume_id, Resume.user_id == user_id).first()
+    resume = await Resume.find_one(Resume.id == resume_id, Resume.user_id == user_id)
     if not resume:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resume not found")
 
     resume.status = "analyzing"
-    db.commit()
+    await resume.save()
 
     try:
         file_bytes = None
@@ -124,7 +119,7 @@ async def analyze_resume(
 
         analysis_result = ai_analyzer.analyze(parsed_text)
 
-        existing = db.query(ResumeAnalysis).filter(ResumeAnalysis.resume_id == resume_id).first()
+        existing = await ResumeAnalysis.find_one(ResumeAnalysis.resume_id == resume_id)
 
         analysis_data = {
             "resume_id": resume_id,
@@ -151,24 +146,22 @@ async def analyze_resume(
         if existing:
             for key, value in analysis_data.items():
                 setattr(existing, key, value)
-            db.commit()
-            db.refresh(existing)
+            existing.updated_at = datetime.utcnow()
+            await existing.save()
             analysis = existing
         else:
             analysis = ResumeAnalysis(**analysis_data)
-            db.add(analysis)
-            db.commit()
-            db.refresh(analysis)
+            await analysis.insert()
 
         resume.ats_score = analysis_result.ats_score
         resume.status = "analyzed"
-        db.commit()
+        await resume.save()
 
         return {"success": True, "data": _serialize_analysis(analysis)}
 
     except Exception as e:
         resume.status = "failed"
-        db.commit()
+        await resume.save()
         logger.error(f"Analysis failed: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -179,18 +172,12 @@ async def analyze_resume(
 @router.get("/list", response_model=List[ResumeListResponse])
 async def list_resumes(
     current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db),
 ):
     user_id = current_user.get("id")
-    resumes = (
-        db.query(Resume)
-        .filter(Resume.user_id == user_id)
-        .order_by(Resume.created_at.desc())
-        .all()
-    )
+    resumes = await Resume.find(Resume.user_id == user_id).sort(-Resume.created_at).to_list()
     return [
         ResumeListResponse(
-            id=r.id,
+            id=str(r.id),
             file_name=r.file_name,
             file_type=r.file_type,
             file_size=r.file_size,
@@ -206,18 +193,17 @@ async def list_resumes(
 async def get_resume(
     resume_id: str,
     current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db),
 ):
     user_id = current_user.get("id")
-    resume = db.query(Resume).filter(Resume.id == resume_id, Resume.user_id == user_id).first()
+    resume = await Resume.find_one(Resume.id == resume_id, Resume.user_id == user_id)
     if not resume:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resume not found")
 
-    analysis = db.query(ResumeAnalysis).filter(ResumeAnalysis.resume_id == resume_id).first()
+    analysis = await ResumeAnalysis.find_one(ResumeAnalysis.resume_id == resume_id)
 
     return ResumeDetailResponse(
         resume=ResumeListResponse(
-            id=resume.id,
+            id=str(resume.id),
             file_name=resume.file_name,
             file_type=resume.file_type,
             file_size=resume.file_size,
@@ -233,16 +219,19 @@ async def get_resume(
 async def delete_resume(
     resume_id: str,
     current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db),
 ):
     user_id = current_user.get("id")
-    resume = db.query(Resume).filter(Resume.id == resume_id, Resume.user_id == user_id).first()
+    resume = await Resume.find_one(Resume.id == resume_id, Resume.user_id == user_id)
     if not resume:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resume not found")
 
     storage_service.delete(resume.file_url)
-    db.delete(resume)
-    db.commit()
+
+    analysis = await ResumeAnalysis.find_one(ResumeAnalysis.resume_id == resume_id)
+    if analysis:
+        await analysis.delete()
+
+    await resume.delete()
 
     return {"success": True, "message": "Resume deleted successfully"}
 
@@ -251,33 +240,30 @@ async def delete_resume(
 async def reanalyze_resume(
     resume_id: str,
     current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db),
 ):
     user_id = current_user.get("id")
-    resume = db.query(Resume).filter(Resume.id == resume_id, Resume.user_id == user_id).first()
+    resume = await Resume.find_one(Resume.id == resume_id, Resume.user_id == user_id)
     if not resume:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resume not found")
 
-    existing_analysis = db.query(ResumeAnalysis).filter(ResumeAnalysis.resume_id == resume_id).first()
+    existing_analysis = await ResumeAnalysis.find_one(ResumeAnalysis.resume_id == resume_id)
     if existing_analysis:
-        db.delete(existing_analysis)
-        db.commit()
+        await existing_analysis.delete()
 
-    return await analyze_resume(resume_id, current_user, db)
+    return await analyze_resume(resume_id, current_user)
 
 
 @router.get("/{resume_id}/analysis")
 async def get_analysis(
     resume_id: str,
     current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db),
 ):
     user_id = current_user.get("id")
-    resume = db.query(Resume).filter(Resume.id == resume_id, Resume.user_id == user_id).first()
+    resume = await Resume.find_one(Resume.id == resume_id, Resume.user_id == user_id)
     if not resume:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resume not found")
 
-    analysis = db.query(ResumeAnalysis).filter(ResumeAnalysis.resume_id == resume_id).first()
+    analysis = await ResumeAnalysis.find_one(ResumeAnalysis.resume_id == resume_id)
     if not analysis:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analysis not found. Run analysis first.")
 
@@ -286,7 +272,7 @@ async def get_analysis(
 
 def _serialize_analysis(analysis: ResumeAnalysis) -> dict:
     return {
-        "id": analysis.id,
+        "id": str(analysis.id),
         "resume_id": analysis.resume_id,
         "parsed_name": analysis.parsed_name,
         "parsed_email": analysis.parsed_email,

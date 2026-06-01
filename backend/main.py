@@ -1,4 +1,5 @@
 import logging
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
@@ -11,40 +12,36 @@ from backend.app.middleware.cors import setup_cors
 from backend.app.middleware.security import setup_security_headers
 from backend.app.middleware.rate_limit import RateLimitMiddleware, FeatureAccessMiddleware
 from backend.app.api.router import api_router
+from backend.app.db.session import init_db, close_db
 
 logger = logging.getLogger(__name__)
 
-# Initialize system loggers
 setup_logging()
 
-# Instantiate FastAPI application
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await init_db()
+    yield
+    await close_db()
+
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     description="CareerCopilot AI platform backend services.",
     version="1.0.0",
     docs_url="/docs" if settings.ENVIRONMENT != "production" else None,
     redoc_url="/redoc" if settings.ENVIRONMENT != "production" else None,
+    lifespan=lifespan,
 )
 
-# Register CORS middleware first
 setup_cors(app)
-
-# Register security headers
 setup_security_headers(app)
-
-# Rate limiting (per-IP, 60 req/min)
 app.add_middleware(RateLimitMiddleware, requests_per_minute=60)
-
-# Feature access control for premium features
 app.add_middleware(FeatureAccessMiddleware)
-
-# Request metrics and monitoring
 app.add_middleware(MetricsMiddleware)
-
-# Compression
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-# Trusted hosts
 if settings.ENVIRONMENT == "production":
     app.add_middleware(
         TrustedHostMiddleware,
@@ -58,10 +55,7 @@ if settings.ENVIRONMENT == "production":
         ],
     )
 
-# Setup centralized exception mappings
 register_exception_handlers(app)
-
-# Mount API sub-routes
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
 

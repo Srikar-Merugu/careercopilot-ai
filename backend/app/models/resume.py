@@ -1,58 +1,53 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Text, Integer, Float, DateTime, ForeignKey, JSON
-from sqlalchemy.orm import relationship
-from backend.app.db.session import Base
+from beanie import Document
+from pydantic import Field
 
 
-class Resume(Base):
-    __tablename__ = "resumes"
+class Resume(Document):
+    user_id: str = Field(..., index=True)
+    file_name: str = Field(...)
+    file_type: str = Field(...)
+    file_size: int = Field(...)
+    file_url: str = Field(...)
+    parsed_text: str | None = Field(default=None)
+    ats_score: float | None = Field(default=None)
+    status: str = Field(default="uploaded")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    user_id = Column(String, nullable=False, index=True)
-    file_name = Column(String(255), nullable=False)
-    file_type = Column(String(10), nullable=False)
-    file_size = Column(Integer, nullable=False)
-    file_url = Column(String(512), nullable=False)
-    parsed_text = Column(Text, nullable=True)
-    ats_score = Column(Float, nullable=True)
-    status = Column(String(20), default="uploaded")
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    analysis = relationship("ResumeAnalysis", back_populates="resume", uselist=False, cascade="all, delete-orphan")
+    class Settings:
+        name = "resumes"
 
 
-class ResumeAnalysis(Base):
-    __tablename__ = "resume_analysis"
+class ResumeAnalysis(Document):
+    resume_id: str = Field(..., index=True, unique=True)
 
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    resume_id = Column(String, ForeignKey("resumes.id", ondelete="CASCADE"), nullable=False, unique=True)
+    parsed_name: str | None = Field(default=None)
+    parsed_email: str | None = Field(default=None)
+    parsed_phone: str | None = Field(default=None)
+    parsed_skills: list | None = Field(default=[])
+    parsed_experience: list | None = Field(default=[])
+    parsed_projects: list | None = Field(default=[])
+    parsed_education: list | None = Field(default=[])
+    parsed_certifications: list | None = Field(default=[])
+    parsed_achievements: list | None = Field(default=[])
 
-    parsed_name = Column(String(255), nullable=True)
-    parsed_email = Column(String(255), nullable=True)
-    parsed_phone = Column(String(50), nullable=True)
-    parsed_skills = Column(JSON, nullable=True)
-    parsed_experience = Column(JSON, nullable=True)
-    parsed_projects = Column(JSON, nullable=True)
-    parsed_education = Column(JSON, nullable=True)
-    parsed_certifications = Column(JSON, nullable=True)
-    parsed_achievements = Column(JSON, nullable=True)
+    ats_score: float | None = Field(default=None)
+    ats_breakdown: dict | None = Field(default={})
 
-    ats_score = Column(Float, nullable=True)
-    ats_breakdown = Column(JSON, nullable=True)
+    strengths: list | None = Field(default=[])
+    weaknesses: list | None = Field(default=[])
+    missing_skills: list | None = Field(default=[])
+    recommended_roles: list | None = Field(default=[])
+    career_suggestions: str | None = Field(default="")
+    optimization_tips: list | None = Field(default=[])
 
-    strengths = Column(JSON, nullable=True)
-    weaknesses = Column(JSON, nullable=True)
-    missing_skills = Column(JSON, nullable=True)
-    recommended_roles = Column(JSON, nullable=True)
-    career_suggestions = Column(Text, nullable=True)
-    optimization_tips = Column(JSON, nullable=True)
+    ai_feedback: str | None = Field(default="")
+    ai_raw_response: str | None = Field(default="")
 
-    ai_feedback = Column(Text, nullable=True)
-    ai_raw_response = Column(Text, nullable=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    resume = relationship("Resume", back_populates="analysis")
+    class Settings:
+        name = "resume_analysis"

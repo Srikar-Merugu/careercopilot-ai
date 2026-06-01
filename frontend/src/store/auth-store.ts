@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { supabase } from "@/lib/supabase-client";
+import { authApi, AuthResponse } from "@/lib/api-client";
 
 export interface User {
   id: string;
@@ -25,22 +25,18 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
 
-  // Onboarding progress
   onboardingComplete: boolean;
   onboardingData: Partial<OnboardingData>;
 
-  // Actions
   initializeSession: () => Promise<void>;
   signUp: (email: string, pass: string, name: string) => Promise<any>;
   login: (email: string, pass: string) => Promise<any>;
-  signInWithOAuth: (provider: "google" | "github") => Promise<any>;
   logout: () => Promise<void>;
   forgotPassword: (email: string) => Promise<any>;
   resetPassword: (pass: string) => Promise<any>;
   updateUser: (updatedFields: Partial<User>) => void;
   setLoading: (isLoading: boolean) => void;
 
-  // Onboarding actions
   setOnboardingData: (data: Partial<OnboardingData>) => void;
   completeOnboarding: (data: OnboardingData) => Promise<void>;
 }
@@ -56,35 +52,44 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   initializeSession: async () => {
     try {
       set({ isLoading: true });
-      const { data: { session } } = await supabase.auth.getSession();
+      const token = localStorage.getItem("cc_token");
 
-      if (session) {
-        const metadata = session.user.user_metadata;
-        const mappedUser: User = {
-          id: session.user.id,
-          name: metadata.full_name || session.user.email?.split("@")[0] || "Professional User",
-          email: session.user.email || "",
-          role: "professional",
-          headline: metadata.headline || "AI Career Builder",
-          bio: metadata.bio || "",
-        };
+      if (token) {
+        const res = await authApi.me();
+        if (res.success && res.data) {
+          const userData = res.data;
+          const mappedUser: User = {
+            id: userData.id,
+            name: userData.name || userData.email.split("@")[0] || "Professional User",
+            email: userData.email,
+            role: userData.role,
+            headline: userData.headline || "AI Career Builder",
+            bio: userData.bio || "",
+          };
 
-        // Write cookie for Next.js Middleware security sync
-        if (typeof window !== "undefined") {
-          document.cookie = `cc_session=${session.access_token}; path=/; max-age=${3600 * 24}; SameSite=Lax; Secure`;
+          if (typeof window !== "undefined") {
+            document.cookie = `cc_session=${token}; path=/; max-age=${3600 * 24}; SameSite=Lax; Secure`;
+          }
+
+          set({
+            user: mappedUser,
+            token,
+            isAuthenticated: true,
+            onboardingComplete: userData.onboarding_complete || false,
+          });
+        } else {
+          localStorage.removeItem("cc_token");
+          document.cookie = "cc_session=; path=/; max-age=0; SameSite=Lax";
+          set({ user: null, token: null, isAuthenticated: false });
         }
-
-        set({
-          user: mappedUser,
-          token: session.access_token,
-          isAuthenticated: true,
-          onboardingComplete: metadata.onboarding_complete === true,
-        });
       } else {
         set({ user: null, token: null, isAuthenticated: false });
       }
     } catch (e) {
-      console.error("Zustand auth session sync error:", e);
+      console.error("Auth session sync error:", e);
+      localStorage.removeItem("cc_token");
+      document.cookie = "cc_session=; path=/; max-age=0; SameSite=Lax";
+      set({ user: null, token: null, isAuthenticated: false });
     } finally {
       set({ isLoading: false });
     }
@@ -93,18 +98,27 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   signUp: async (email, pass, name) => {
     set({ isLoading: true });
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password: pass,
-        options: {
-          data: {
-            full_name: name,
-            headline: "AI Career Builder",
-            onboarding_complete: false,
-          },
-        },
+      const data = await authApi.register(name, email, pass);
+
+      localStorage.setItem("cc_token", data.access_token);
+      if (typeof window !== "undefined") {
+        document.cookie = `cc_session=${data.access_token}; path=/; max-age=${3600 * 24}; SameSite=Lax; Secure`;
+      }
+
+      const mappedUser: User = {
+        id: data.user.id,
+        name: data.user.name || email.split("@")[0] || "Professional User",
+        email: data.user.email,
+        role: data.user.role,
+        headline: data.user.headline || "AI Career Builder",
+      };
+
+      set({
+        user: mappedUser,
+        token: data.access_token,
+        isAuthenticated: true,
       });
-      if (error) throw error;
+
       return data;
     } finally {
       set({ isLoading: false });
@@ -114,57 +128,38 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   login: async (email, pass) => {
     set({ isLoading: true });
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password: pass,
-      });
-      if (error) throw error;
+      const data = await authApi.login(email, pass);
 
-      if (data.session) {
-        const metadata = data.user.user_metadata;
-        const mappedUser: User = {
-          id: data.user.id,
-          name: metadata.full_name || data.user.email?.split("@")[0] || "Professional User",
-          email: data.user.email || "",
-          role: "professional",
-          headline: metadata.headline || "AI Career Builder",
-        };
-
-        // Write cookie for Next.js Middleware security sync
-        if (typeof window !== "undefined") {
-          document.cookie = `cc_session=${data.session.access_token}; path=/; max-age=${3600 * 24}; SameSite=Lax; Secure`;
-        }
-
-        set({
-          user: mappedUser,
-          token: data.session.access_token,
-          isAuthenticated: true,
-          onboardingComplete: metadata.onboarding_complete === true,
-        });
+      localStorage.setItem("cc_token", data.access_token);
+      if (typeof window !== "undefined") {
+        document.cookie = `cc_session=${data.access_token}; path=/; max-age=${3600 * 24}; SameSite=Lax; Secure`;
       }
+
+      const mappedUser: User = {
+        id: data.user.id,
+        name: data.user.name || email.split("@")[0] || "Professional User",
+        email: data.user.email,
+        role: data.user.role,
+        headline: data.user.headline || "AI Career Builder",
+      };
+
+      set({
+        user: mappedUser,
+        token: data.access_token,
+        isAuthenticated: true,
+        onboardingComplete: data.user.onboarding_complete || false,
+      });
+
       return data;
     } finally {
       set({ isLoading: false });
     }
   },
 
-  signInWithOAuth: async (provider) => {
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: {
-        redirectTo: `${window.location.origin}/dashboard`,
-      },
-    });
-    if (error) throw error;
-    return data;
-  },
-
   logout: async () => {
     set({ isLoading: true });
     try {
-      await supabase.auth.signOut();
-
-      // Delete cookie for Next.js Middleware security sync
+      localStorage.removeItem("cc_token");
       if (typeof window !== "undefined") {
         document.cookie = "cc_session=; path=/; max-age=0; SameSite=Lax";
       }
@@ -182,19 +177,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   forgotPassword: async (email) => {
-    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
-    if (error) throw error;
-    return data;
+    throw new Error("Password reset via email not implemented yet. Use backend API.");
   },
 
   resetPassword: async (pass) => {
-    const { data, error } = await supabase.auth.updateUser({
-      password: pass,
-    });
-    if (error) throw error;
-    return data;
+    throw new Error("Password reset not implemented yet. Use backend API.");
   },
 
   updateUser: (updatedFields) =>
@@ -214,24 +201,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const { token } = get();
 
-      // Update Supabase user metadata
-      const { error } = await supabase.auth.updateUser({
-        data: {
-          onboarding_complete: true,
-          preferred_roles: data.preferred_roles,
-          experience_level: data.experience_level,
-          locations: data.locations,
-          skills: data.skills,
-          resume_url: data.resume_url,
-          headline: data.headline,
-        },
-      });
-      if (error) throw error;
-
-      // Call backend to persist onboarding data
       if (token) {
         const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-        await fetch(`${apiBase}/api/v1/users/onboarding`, {
+        await fetch(`${apiBase}/users/onboarding`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

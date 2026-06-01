@@ -17,7 +17,7 @@ import { motion } from "framer-motion";
 
 export default function SignupPage() {
   const router = useRouter();
-  const { signUp, signInWithOAuth, isLoading } = useAuthStore();
+  const { signUp, isLoading } = useAuthStore();
   const { toast } = useToast();
 
   const [showPassword, setShowPassword] = useState(false);
@@ -64,30 +64,23 @@ export default function SignupPage() {
   const handleCredentialsSignUp = async (data: SignUpInput) => {
     setAuthError(null);
     try {
-      await signUp(data.email, data.password, data.name);
-      toast(
-        "Verification Email Sent",
-        "Please check your inbox to confirm your email registration.",
-        "success"
-      );
-      router.push("/verify-email");
+      const result = await signUp(data.email, data.password, data.name);
+      if (result?.session) {
+        toast("Portfolio Orchestrated", "Welcome aboard, captain.", "success");
+        router.push("/onboarding");
+      } else {
+        toast(
+          "Verification Email Sent",
+          "Please check your inbox to confirm your email registration.",
+          "success"
+        );
+        router.push("/verify-email");
+      }
     } catch (err: any) {
       console.error(err);
       const msg = err.message || "Registration failed. Please check inputs.";
       setAuthError(msg);
       toast("Sign Up Failed", msg, "error");
-    }
-  };
-
-  const handleSocialOAuth = async (provider: "google" | "github") => {
-    setAuthError(null);
-    try {
-      await signInWithOAuth(provider);
-      toast("Redirecting...", `Connecting to ${provider} authentication...`, "info");
-    } catch (err: any) {
-      console.error(err);
-      const msg = err.message || "Failed to initialize social sign-up.";
-      toast("OAuth Connection Error", msg, "error");
     }
   };
 
@@ -371,32 +364,6 @@ export default function SignupPage() {
                     ) : "Register Portfolio Profile"}
                   </Button>
                 </form>
-
-                <div className="relative my-4 flex items-center justify-center">
-                  <span className="absolute w-full border-t border-white/5" />
-                  <span className="relative bg-[#0b1120]/10 px-3 text-[10px] uppercase text-muted-foreground tracking-wider backdrop-blur-xl">
-                    Or Quick Register
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <Button 
-                    variant="glass" 
-                    size="sm" 
-                    onClick={() => handleSocialOAuth("google")}
-                    className="text-xs h-9"
-                  >
-                    Google SSO
-                  </Button>
-                  <Button 
-                    variant="glass" 
-                    size="sm" 
-                    onClick={() => handleSocialOAuth("github")}
-                    className="text-xs h-9"
-                  >
-                    GitHub SSO
-                  </Button>
-                </div>
 
               </CardContent>
               <CardFooter className="flex justify-center text-xs border-t border-white/[0.03] pt-4">

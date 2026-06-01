@@ -10,8 +10,10 @@ services:
         value: production
       - key: LOG_LEVEL
         value: info
-      - key: DATABASE_URL
+      - key: MONGODB_URL
         sync: false
+      - key: MONGODB_DB
+        value: careercopilot
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_ANON_KEY
@@ -49,7 +51,7 @@ services:
         value: production
       - key: REDIS_URL
         sync: false
-      - key: DATABASE_URL
+      - key: MONGODB_URL
         sync: false
     autoDeploy: true
     plan: starter

@@ -1,16 +1,21 @@
+from backend.app.models.user import UserModel
 from backend.app.models.resume import Resume, ResumeAnalysis
 from backend.app.models.job import Job, SavedJob, JobMatch
-from backend.app.models.ai import Embedding, CareerInsight, Recommendation
-from backend.app.models.dashboard import Application, Notification, Subscription, ActivityLog
-from backend.app.models.interview import Interview, InterviewQuestion, InterviewFeedback
-from backend.app.models.telegram import TelegramUser, TelegramAlert, BotActivity
-from backend.app.models.automation import AutoApplication, CoverLetter, AutomationQueue, AutomationSession
+from backend.app.models.ai import Embedding, CareerInsight, Recommendation, EmbeddingType
+from backend.app.models.dashboard import Application, Notification, Subscription, ActivityLog, ApplicationStatus, NotificationType, SubscriptionPlan, SubscriptionStatus
+from backend.app.models.interview import Interview, InterviewQuestion, InterviewFeedback, InterviewType, InterviewStatus
+from backend.app.models.telegram import TelegramUser, TelegramAlert, BotActivity, AlertType
+from backend.app.models.automation import AutoApplication, CoverLetter, AutomationQueue, AutomationSession, ApplicationStatus as AutoAppStatus, AutomationQueueStatus
 
 __all__ = [
-    "Resume", "ResumeAnalysis", "Job", "SavedJob", "JobMatch",
-    "Embedding", "CareerInsight", "Recommendation",
+    "UserModel",
+    "Resume", "ResumeAnalysis",
+    "Job", "SavedJob", "JobMatch",
+    "Embedding", "CareerInsight", "Recommendation", "EmbeddingType",
     "Application", "Notification", "Subscription", "ActivityLog",
-    "Interview", "InterviewQuestion", "InterviewFeedback",
-    "TelegramUser", "TelegramAlert", "BotActivity",
+    "ApplicationStatus", "NotificationType", "SubscriptionPlan", "SubscriptionStatus",
+    "Interview", "InterviewQuestion", "InterviewFeedback", "InterviewType", "InterviewStatus",
+    "TelegramUser", "TelegramAlert", "BotActivity", "AlertType",
     "AutoApplication", "CoverLetter", "AutomationQueue", "AutomationSession",
+    "AutoAppStatus", "AutomationQueueStatus",
 ]

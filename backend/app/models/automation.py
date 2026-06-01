@@ -1,8 +1,7 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Text, Float, Boolean, DateTime, JSON, Integer, Enum as SAEnum
-from sqlalchemy.dialects.postgresql import UUID
-from backend.app.db.session import Base
+from beanie import Document
+from pydantic import Field
 import enum
 
 
@@ -26,73 +25,73 @@ class AutomationQueueStatus(str, enum.Enum):
     CANCELLED = "cancelled"
 
 
-class AutoApplication(Base):
-    __tablename__ = "auto_applications"
+class AutoApplication(Document):
+    user_id: str = Field(..., index=True)
+    job_id: str = Field(...)
+    job_title: str | None = Field(default=None)
+    company: str | None = Field(default=None)
+    platform: str | None = Field(default=None)
+    job_url: str | None = Field(default=None)
+    status: ApplicationStatus = Field(default=ApplicationStatus.PENDING)
+    cover_letter_id: str | None = Field(default=None)
+    ats_score: float | None = Field(default=None)
+    match_score: float | None = Field(default=None)
+    applied_at: datetime | None = Field(default=None)
+    automation_log: list = Field(default=[])
+    error_message: str | None = Field(default=None)
+    retry_count: int = Field(default=0)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(String(255), nullable=False, index=True)
-    job_id = Column(String(255), nullable=False)
-    job_title = Column(String(500), nullable=True)
-    company = Column(String(500), nullable=True)
-    platform = Column(String(100), nullable=True)
-    job_url = Column(Text, nullable=True)
-    status = Column(SAEnum(ApplicationStatus), nullable=False, default=ApplicationStatus.PENDING)
-    cover_letter_id = Column(UUID(as_uuid=True), nullable=True)
-    ats_score = Column(Float, nullable=True)
-    match_score = Column(Float, nullable=True)
-    applied_at = Column(DateTime, nullable=True)
-    automation_log = Column(JSON, default=list, nullable=True)
-    error_message = Column(Text, nullable=True)
-    retry_count = Column(Integer, default=0, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-
-
-class CoverLetter(Base):
-    __tablename__ = "cover_letters"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(String(255), nullable=False, index=True)
-    company = Column(String(500), nullable=False)
-    role = Column(String(500), nullable=False)
-    content = Column(Text, nullable=False)
-    tone = Column(String(50), default="professional")
-    is_template = Column(Boolean, default=False)
-    ai_generated = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    class Settings:
+        name = "auto_applications"
 
 
-class AutomationQueue(Base):
-    __tablename__ = "automation_queue"
+class CoverLetter(Document):
+    user_id: str = Field(..., index=True)
+    company: str = Field(...)
+    role: str = Field(...)
+    content: str = Field(...)
+    tone: str = Field(default="professional")
+    is_template: bool = Field(default=False)
+    ai_generated: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(String(255), nullable=False, index=True)
-    job_id = Column(String(255), nullable=False)
-    job_title = Column(String(500), nullable=True)
-    company = Column(String(500), nullable=True)
-    platform = Column(String(100), nullable=True)
-    job_url = Column(Text, nullable=True)
-    priority = Column(Integer, default=0, nullable=False)
-    status = Column(SAEnum(AutomationQueueStatus), nullable=False, default=AutomationQueueStatus.QUEUED)
-    retry_count = Column(Integer, default=0, nullable=False)
-    max_retries = Column(Integer, default=3, nullable=False)
-    scheduled_for = Column(DateTime, nullable=True)
-    started_at = Column(DateTime, nullable=True)
-    completed_at = Column(DateTime, nullable=True)
-    error_message = Column(Text, nullable=True)
-    meta_data = Column("metadata", JSON, default=dict, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    class Settings:
+        name = "cover_letters"
 
 
-class AutomationSession(Base):
-    __tablename__ = "automation_sessions"
+class AutomationQueue(Document):
+    user_id: str = Field(..., index=True)
+    job_id: str = Field(...)
+    job_title: str | None = Field(default=None)
+    company: str | None = Field(default=None)
+    platform: str | None = Field(default=None)
+    job_url: str | None = Field(default=None)
+    priority: int = Field(default=0)
+    status: AutomationQueueStatus = Field(default=AutomationQueueStatus.QUEUED)
+    retry_count: int = Field(default=0)
+    max_retries: int = Field(default=3)
+    scheduled_for: datetime | None = Field(default=None)
+    started_at: datetime | None = Field(default=None)
+    completed_at: datetime | None = Field(default=None)
+    error_message: str | None = Field(default=None)
+    meta_data: dict = Field(default={})
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(String(255), nullable=False, index=True)
-    platform = Column(String(100), nullable=False)
-    session_data = Column(JSON, default=dict, nullable=True)
-    cookies = Column(JSON, default=dict, nullable=True)
-    is_active = Column(Boolean, default=True)
-    last_used = Column(DateTime, default=datetime.utcnow)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    expires_at = Column(DateTime, nullable=True)
+    class Settings:
+        name = "automation_queue"
+
+
+class AutomationSession(Document):
+    user_id: str = Field(..., index=True)
+    platform: str = Field(...)
+    session_data: dict = Field(default={})
+    cookies: dict = Field(default={})
+    is_active: bool = Field(default=True)
+    last_used: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    expires_at: datetime | None = Field(default=None)
+
+    class Settings:
+        name = "automation_sessions"

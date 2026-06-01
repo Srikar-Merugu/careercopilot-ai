@@ -1,10 +1,8 @@
 import logging
 from typing import Optional
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
-from sqlalchemy import desc
 from backend.app.core.security import get_current_user
-from backend.app.db.session import get_db
 from backend.app.models.job import Job, SavedJob, JobMatch
 from backend.app.schemas.job import (
     JobResponse, JobSearchParams, JobSearchResponse,
@@ -87,7 +85,7 @@ async def search_jobs(
             "apply_url": jd.apply_url,
             "category": jd.category,
             "posted_at": jd.posted_at,
-            "created_at": jd.posted_at or __import__("datetime").datetime.utcnow(),
+            "created_at": jd.posted_at or datetime.utcnow(),
         }
         jobs_response.append(JobResponse(**job_dict))
 
@@ -99,8 +97,7 @@ async def search_jobs(
         jobs_response.sort(key=lambda j: j.salary_min or 0)
 
     if days_ago:
-        from datetime import datetime, timedelta
-        cutoff = datetime.utcnow() - timedelta(days=days_ago)
+        cutoff = datetime.utcnow() - __import__("datetime").timedelta(days=days_ago)
         jobs_response = [j for j in jobs_response if j.posted_at and j.posted_at >= cutoff]
 
     total = len(jobs_response)
@@ -119,7 +116,6 @@ async def search_jobs(
 async def get_job_match(
     job_id: str,
     current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db),
 ):
     job = None
     job_data = None
@@ -129,7 +125,7 @@ async def get_job_match(
             break
 
     if not job_data:
-        job = db.query(Job).filter(Job.id == job_id).first()
+        job = await Job.find_one(Job.id == job_id)
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
         job_skills = job.required_skills or []
@@ -175,20 +171,15 @@ async def get_job_match(
 async def save_job(
     job_id: str,
     current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db),
 ):
     user_id = current_user.get("id")
-    existing = db.query(SavedJob).filter(
-        SavedJob.user_id == user_id,
-        SavedJob.job_id == job_id,
-    ).first()
+    existing = await SavedJob.find_one(SavedJob.user_id == user_id, SavedJob.job_id == job_id)
 
     if existing:
         return {"success": True, "message": "Job already saved", "saved": True}
 
     saved = SavedJob(user_id=user_id, job_id=job_id)
-    db.add(saved)
-    db.commit()
+    await saved.insert()
 
     return {"success": True, "message": "Job saved successfully", "saved": True}
 
@@ -197,17 +188,12 @@ async def save_job(
 async def unsave_job(
     job_id: str,
     current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db),
 ):
     user_id = current_user.get("id")
-    saved = db.query(SavedJob).filter(
-        SavedJob.user_id == user_id,
-        SavedJob.job_id == job_id,
-    ).first()
+    saved = await SavedJob.find_one(SavedJob.user_id == user_id, SavedJob.job_id == job_id)
 
     if saved:
-        db.delete(saved)
-        db.commit()
+        await saved.delete()
 
     return {"success": True, "message": "Job unsaved", "saved": False}
 
@@ -215,25 +201,19 @@ async def unsave_job(
 @router.get("/saved/list")
 async def list_saved_jobs(
     current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db),
 ):
     user_id = current_user.get("id")
-    saved = (
-        db.query(SavedJob)
-        .filter(SavedJob.user_id == user_id)
-        .order_by(desc(SavedJob.saved_at))
-        .all()
-    )
+    saved = await SavedJob.find(SavedJob.user_id == user_id).sort(-SavedJob.saved_at).to_list()
 
     result = []
     for s in saved:
-        job = db.query(Job).filter(Job.id == s.job_id).first()
+        job = await Job.find_one(Job.id == s.job_id)
         if job:
             result.append({
-                "id": s.id,
+                "id": str(s.id),
                 "job_id": s.job_id,
                 "job": {
-                    "id": job.id,
+                    "id": str(job.id),
                     "source": job.source,
                     "title": job.title,
                     "company": job.company,
@@ -245,8 +225,7 @@ async def list_saved_jobs(
                 "saved_at": s.saved_at.isoformat() if s.saved_at else None,
             })
         else:
-            db.delete(s)
-            db.commit()
+            await s.delete()
 
     return {"success": True, "data": result}
 
@@ -254,7 +233,6 @@ async def list_saved_jobs(
 @router.get("/recommendations", response_model=JobRecommendationResponse)
 async def get_recommendations(
     current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db),
 ):
     user_skills = current_user.get("skills", [
         "JavaScript", "React", "TypeScript", "Python", "Node.js",
