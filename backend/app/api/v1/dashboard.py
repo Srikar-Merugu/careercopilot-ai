@@ -1,216 +1,399 @@
 import logging
 from typing import List, Optional
-from uuid import UUID
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, Query, Body
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from backend.app.schemas.dashboard import (
     ApplicationCreate, ApplicationUpdate, ApplicationResponse,
     NotificationResponse, SubscriptionResponse, SubscriptionUpdate,
     ActivityLogResponse, DashboardAnalytics, ProfileUpdate, ProfileResponse,
 )
+from backend.app.models.dashboard import (
+    Application, Notification, Subscription, ActivityLog,
+    ApplicationStatus,
+)
+from backend.app.models.job import SavedJob, JobMatch
+from backend.app.models.user import UserModel
+from backend.app.models.resume import ResumeAnalysis
+from backend.app.core.security import get_current_user
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-MOCK_USER_ID = "mock_jwt_token_for_career_copilot_frontend"
+
+def _get_user_id(current_user: dict) -> str:
+    return current_user.get("id") or current_user.get("_id", "")
 
 
 @router.get("/analytics", response_model=DashboardAnalytics)
-async def get_dashboard_analytics(user_id: str = Query(MOCK_USER_ID)):
+async def get_dashboard_analytics(current_user: dict = Depends(get_current_user)):
+    user_id = _get_user_id(current_user)
+
+    apps = await Application.find(Application.user_id == user_id).to_list()
+    by_status: dict[str, int] = {}
+    for s in ApplicationStatus:
+        by_status[s.value] = 0
+    for a in apps:
+        by_status[a.status.value] = by_status.get(a.status.value, 0) + 1
+
+    total = len(apps)
+    active = by_status.get("applied", 0) + by_status.get("interview", 0)
+    interviews = by_status.get("interview", 0)
+    offers = by_status.get("offer", 0)
+
+    saved_count = await SavedJob.find(SavedJob.user_id == user_id).count()
+
+    matches = await JobMatch.find(JobMatch.user_id == user_id).to_list()
+    avg_match = 0.0
+    if matches:
+        scores = [m.match_score for m in matches if m.match_score is not None]
+        if scores:
+            avg_match = sum(scores) / len(scores)
+
+    user = await UserModel.get(user_id)
+    ats = user.ats_score if user and user.ats_score is not None else 0.0
+
+    analyses = await ResumeAnalysis.find(
+        {"user_id": user_id}
+    ).sort(-ResumeAnalysis.created_at).limit(1).to_list()
+    interview_readiness = 0.0
+    if analyses and analyses[0].ats_score is not None:
+        interview_readiness = min(analyses[0].ats_score * 1.0, 100.0)
+
+    weekly_growth = 0.0
+
+    recent = (
+        await ActivityLog.find(ActivityLog.user_id == user_id)
+        .sort(-ActivityLog.created_at)
+        .limit(5)
+        .to_list()
+    )
+
     return DashboardAnalytics(
-        total_applications=24,
-        active_applications=12,
-        interviews_scheduled=3,
-        offers_received=1,
-        saved_jobs_count=18,
-        avg_match_score=78.4,
-        interview_readiness=72.0,
-        ats_score=85.0,
-        weekly_growth=12.5,
-        applications_by_status={
-            "saved": 8, "applied": 6, "interview": 3,
-            "offer": 1, "rejected": 4, "withdrawn": 2
-        },
+        total_applications=total,
+        active_applications=active,
+        interviews_scheduled=interviews,
+        offers_received=offers,
+        saved_jobs_count=saved_count,
+        avg_match_score=round(avg_match, 1),
+        interview_readiness=round(interview_readiness, 1),
+        ats_score=round(ats, 1),
+        weekly_growth=round(weekly_growth, 1),
+        applications_by_status=by_status,
         recent_activity=[
             ActivityLogResponse(
-                id=UUID(int=1), activity_type="application_update",
-                description="Applied to Senior Engineer at Google",
-                created_at=datetime.utcnow(),
-            ),
-            ActivityLogResponse(
-                id=UUID(int=2), activity_type="ai_match",
-                description="AI matched you with 3 new positions",
-                created_at=datetime.utcnow(),
-            ),
-            ActivityLogResponse(
-                id=UUID(int=3), activity_type="interview",
-                description="Interview scheduled with Stripe on Friday",
-                created_at=datetime.utcnow(),
-            ),
-            ActivityLogResponse(
-                id=UUID(int=4), activity_type="resume_analysis",
-                description="Resume ATS score updated to 85%",
-                created_at=datetime.utcnow(),
-            ),
-            ActivityLogResponse(
-                id=UUID(int=5), activity_type="skill_gap",
-                description="New skill gap analysis available",
-                created_at=datetime.utcnow(),
-            ),
-        ]
+                id=str(a.id),
+                activity_type=a.activity_type,
+                description=a.description,
+                metadata=a.meta_data,
+                created_at=a.created_at,
+            )
+            for a in recent
+        ],
     )
 
 
 @router.get("/applications", response_model=List[ApplicationResponse])
 async def list_applications(
-    user_id: str = Query(MOCK_USER_ID),
+    current_user: dict = Depends(get_current_user),
     status: Optional[str] = Query(None),
 ):
-    mock_apps = [
-        ApplicationResponse(
-            id=UUID(int=i), job_id=UUID(int=i), job_title=title, company=comp,
-            location=loc, salary_range=sal, status=stat, notes=None,
-            interview_date=dt, apply_url=None, created_at=datetime.utcnow(), updated_at=datetime.utcnow(),
-        )
-        for i, (title, comp, loc, sal, stat, dt) in enumerate([
-            ("Senior Frontend Engineer", "Google", "Mountain View, CA", "$180k-$220k", "applied", None),
-            ("Staff Backend Engineer", "Stripe", "San Francisco, CA", "$200k-$250k", "interview", datetime(2026, 6, 5, 14, 0)),
-            ("AI Research Engineer", "OpenAI", "San Francisco, CA", "$220k-$300k", "interview", datetime(2026, 6, 10, 11, 0)),
-            ("Full Stack Developer", "Vercel", "Remote", "$160k-$200k", "applied", None),
-            ("Product Engineer", "Linear", "Remote", "$170k-$210k", "saved", None),
-            ("Software Engineer", "Notion", "New York, NY", "$175k-$215k", "offer", None),
-            ("DevOps Lead", "Datadog", "Remote", "$185k-$230k", "rejected", None),
-            ("ML Platform Engineer", "Netflix", "Los Gatos, CA", "$250k-$350k", "saved", None),
-            ("React Native Developer", "Spotify", "New York, NY", "$160k-$195k", "applied", None),
-            ("Engineering Manager", "GitHub", "Remote", "$200k-$260k", "interview", datetime(2026, 6, 15, 13, 0)),
-        ])
-    ]
+    user_id = _get_user_id(current_user)
+    query = Application.find(Application.user_id == user_id)
     if status:
-        mock_apps = [a for a in mock_apps if a.status == status]
-    return mock_apps
+        query = query.find(Application.status == status)
+    apps = await query.sort(-Application.updated_at).to_list()
+    return [
+        ApplicationResponse(
+            id=str(a.id),
+            job_id=str(a.job_id) if a.job_id else None,
+            job_title=a.job_title,
+            company=a.company,
+            location=a.location,
+            salary_range=a.salary_range,
+            status=a.status.value,
+            notes=a.notes,
+            interview_date=a.interview_date,
+            apply_url=a.apply_url,
+            created_at=a.created_at,
+            updated_at=a.updated_at,
+        )
+        for a in apps
+    ]
 
 
 @router.post("/applications", response_model=ApplicationResponse)
-async def create_application(app: ApplicationCreate, user_id: str = Body(MOCK_USER_ID)):
+async def create_application(
+    app: ApplicationCreate,
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = _get_user_id(current_user)
+    doc = Application(
+        user_id=user_id,
+        job_id=app.job_id,
+        job_title=app.job_title,
+        company=app.company,
+        location=app.location,
+        salary_range=app.salary_range,
+        status=app.status,
+        notes=app.notes,
+        apply_url=app.apply_url,
+    )
+    await doc.insert()
     return ApplicationResponse(
-        id=UUID(int=99), job_id=app.job_id, job_title=app.job_title,
-        company=app.company, location=app.location, salary_range=app.salary_range,
-        status=app.status, notes=app.notes, interview_date=None,
-        apply_url=app.apply_url, created_at=datetime.utcnow(), updated_at=datetime.utcnow(),
+        id=str(doc.id),
+        job_id=str(doc.job_id) if doc.job_id else None,
+        job_title=doc.job_title,
+        company=doc.company,
+        location=doc.location,
+        salary_range=doc.salary_range,
+        status=doc.status.value,
+        notes=doc.notes,
+        interview_date=doc.interview_date,
+        apply_url=doc.apply_url,
+        created_at=doc.created_at,
+        updated_at=doc.updated_at,
     )
 
 
 @router.patch("/applications/{app_id}", response_model=ApplicationResponse)
-async def update_application(app_id: UUID, update: ApplicationUpdate):
+async def update_application(
+    app_id: str,
+    update: ApplicationUpdate,
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = _get_user_id(current_user)
+    doc = await Application.find_one(
+        Application.id == app_id,
+        Application.user_id == user_id,
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    if update.status is not None:
+        doc.status = update.status
+    if update.notes is not None:
+        doc.notes = update.notes
+    if update.interview_date is not None:
+        doc.interview_date = update.interview_date
+    doc.updated_at = datetime.utcnow()
+    await doc.save()
+
     return ApplicationResponse(
-        id=app_id, job_id=None, job_title="Updated Position", company="Company",
-        status=update.status or "applied", notes=update.notes, interview_date=update.interview_date,
-        created_at=datetime.utcnow(), updated_at=datetime.utcnow(),
+        id=str(doc.id),
+        job_id=str(doc.job_id) if doc.job_id else None,
+        job_title=doc.job_title,
+        company=doc.company,
+        location=doc.location,
+        salary_range=doc.salary_range,
+        status=doc.status.value,
+        notes=doc.notes,
+        interview_date=doc.interview_date,
+        apply_url=doc.apply_url,
+        created_at=doc.created_at,
+        updated_at=doc.updated_at,
     )
 
 
 @router.delete("/applications/{app_id}")
-async def delete_application(app_id: UUID):
+async def delete_application(
+    app_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = _get_user_id(current_user)
+    doc = await Application.find_one(
+        Application.id == app_id,
+        Application.user_id == user_id,
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Application not found")
+    await doc.delete()
     return {"success": True, "message": "Application removed"}
 
 
 @router.get("/notifications", response_model=List[NotificationResponse])
-async def list_notifications(user_id: str = Query(MOCK_USER_ID), unread_only: bool = Query(False)):
-    all_notifications = [
-        NotificationResponse(
-            id=UUID(int=i), type=t, title=title, content=content,
-            metadata=None, is_read=read, created_at=datetime.utcnow(),
-        )
-        for i, (t, title, content, read) in enumerate([
-            ("ai_recommendation", "New AI Match: Senior Engineer at Google", "Your profile matches 92% with this position", False),
-            ("interview_reminder", "Interview Tomorrow: Stripe @ 2PM", "Prepare for your technical interview with Stripe", False),
-            ("application_update", "Application Status Update: Notion", "Your application has moved to offer stage", False),
-            ("job_alert", "3 New Remote Positions Available", "AI found matching positions based on your profile", True),
-            ("career_insight", "Weekly Career Insight: Skill Growth", "Your top skill to develop this week: System Design", True),
-            ("resume_analysis", "Resume Analysis Complete", "Your ATS score improved to 87%", True),
-            ("system", "Welcome to CareerCopilot Pro", "Your Pro plan features are now active", False),
-        ])
-    ]
+async def list_notifications(
+    current_user: dict = Depends(get_current_user),
+    unread_only: bool = Query(False),
+):
+    user_id = _get_user_id(current_user)
+    query = Notification.find(Notification.user_id == user_id)
     if unread_only:
-        all_notifications = [n for n in all_notifications if not n.is_read]
-    return all_notifications
+        query = query.find(Notification.is_read == False)
+    notifs = await query.sort(-Notification.created_at).to_list()
+    return [
+        NotificationResponse(
+            id=str(n.id),
+            type=n.type.value if hasattr(n.type, "value") else str(n.type),
+            title=n.title,
+            content=n.content,
+            metadata=n.meta_data,
+            is_read=n.is_read,
+            created_at=n.created_at,
+        )
+        for n in notifs
+    ]
 
 
 @router.patch("/notifications/{notif_id}/read")
-async def mark_notification_read(notif_id: UUID):
+async def mark_notification_read(
+    notif_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = _get_user_id(current_user)
+    doc = await Notification.find_one(
+        Notification.id == notif_id,
+        Notification.user_id == user_id,
+    )
+    if doc:
+        doc.is_read = True
+        await doc.save()
     return {"success": True}
 
 
 @router.patch("/notifications/read-all")
-async def mark_all_notifications_read(user_id: str = Body(MOCK_USER_ID)):
+async def mark_all_notifications_read(
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = _get_user_id(current_user)
+    await Notification.find(
+        Notification.user_id == user_id,
+        Notification.is_read == False,
+    ).update({"$set": {"is_read": True}})
     return {"success": True, "message": "All notifications marked as read"}
 
 
 @router.get("/subscription", response_model=SubscriptionResponse)
-async def get_subscription(user_id: str = Query(MOCK_USER_ID)):
+async def get_subscription(current_user: dict = Depends(get_current_user)):
+    user_id = _get_user_id(current_user)
+    sub = await Subscription.find_one(Subscription.user_id == user_id)
+    if not sub:
+        return SubscriptionResponse(
+            id="",
+            plan="free",
+            status="active",
+            renewal_date=None,
+            features_used={},
+            created_at=datetime.utcnow(),
+        )
     return SubscriptionResponse(
-        id=UUID(int=1), plan="pro", status="active", renewal_date=datetime(2026, 7, 15),
-        features_used={"ai_matches": 142, "resume_analyses": 8, "saved_jobs": 18},
-        created_at=datetime.utcnow(),
+        id=str(sub.id),
+        plan=sub.plan.value if hasattr(sub.plan, "value") else str(sub.plan),
+        status=sub.status.value if hasattr(sub.status, "value") else str(sub.status),
+        renewal_date=sub.renewal_date,
+        features_used=sub.features_used,
+        created_at=sub.created_at,
     )
 
 
 @router.post("/subscription/upgrade", response_model=SubscriptionResponse)
-async def upgrade_subscription(update: SubscriptionUpdate, user_id: str = Body(MOCK_USER_ID)):
+async def upgrade_subscription(
+    update: SubscriptionUpdate,
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = _get_user_id(current_user)
+    sub = await Subscription.find_one(Subscription.user_id == user_id)
+    if sub:
+        sub.plan = update.plan
+        sub.updated_at = datetime.utcnow()
+        await sub.save()
+    else:
+        sub = Subscription(
+            user_id=user_id,
+            plan=update.plan,
+            status="active",
+        )
+        await sub.insert()
     return SubscriptionResponse(
-        id=UUID(int=1), plan=update.plan, status="active",
-        renewal_date=datetime(2026, 7, 15), features_used={}, created_at=datetime.utcnow(),
+        id=str(sub.id),
+        plan=sub.plan.value if hasattr(sub.plan, "value") else str(sub.plan),
+        status=sub.status.value if hasattr(sub.status, "value") else str(sub.status),
+        renewal_date=sub.renewal_date,
+        features_used=sub.features_used,
+        created_at=sub.created_at,
     )
 
 
 @router.get("/activity", response_model=List[ActivityLogResponse])
-async def get_activity_log(user_id: str = Query(MOCK_USER_ID), limit: int = Query(20, ge=1, le=100)):
-    activities = [
-        ActivityLogResponse(id=UUID(int=i), activity_type=t, description=d, metadata=None, created_at=datetime.utcnow())
-        for i, (t, d) in enumerate([
-            ("application_update", "Applied to Senior Frontend Engineer at Google"),
-            ("ai_match", "AI match score calculated: 92% for Staff Engineer at Stripe"),
-            ("interview", "Interview confirmed with Stripe on June 5th at 2:00 PM"),
-            ("resume_analysis", "Resume ATS re-scored: 87% (+2% improvement)"),
-            ("skill_gap", "Skill gap analysis completed: 5 missing skills identified"),
-            ("application_update", "Application status changed to 'Offer' for Notion"),
-            ("ai_recommendation", "3 new AI recommendations generated for your profile"),
-            ("saved_job", "Saved job: ML Platform Engineer at Netflix"),
-            ("interview", "Interview preparation materials generated for Stripe"),
-            ("career_insight", "Weekly career insight report is now available"),
-            ("application_update", "Rejected from DevOps Lead at Datadog"),
-            ("ai_match", "Batch match completed: 15 jobs analyzed against your resume"),
-            ("subscription", "Upgraded to CareerCopilot Pro plan"),
-            ("profile_update", "Profile skills updated: added System Design, Kubernetes"),
-            ("notification", "AI recommendation: Consider learning LangChain"),
-        ])
+async def get_activity_log(
+    current_user: dict = Depends(get_current_user),
+    limit: int = Query(20, ge=1, le=100),
+):
+    user_id = _get_user_id(current_user)
+    activities = (
+        await ActivityLog.find(ActivityLog.user_id == user_id)
+        .sort(-ActivityLog.created_at)
+        .limit(limit)
+        .to_list()
+    )
+    return [
+        ActivityLogResponse(
+            id=str(a.id),
+            activity_type=a.activity_type,
+            description=a.description,
+            metadata=a.meta_data,
+            created_at=a.created_at,
+        )
+        for a in activities
     ]
-    return activities[:limit]
 
 
 @router.get("/profile", response_model=ProfileResponse)
-async def get_profile(user_id: str = Query(MOCK_USER_ID)):
+async def get_profile(current_user: dict = Depends(get_current_user)):
+    user_id = _get_user_id(current_user)
+    user = await UserModel.get(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
     return ProfileResponse(
-        id=user_id, name="Alex Chen", email="alex@example.com",
-        headline="Senior Full Stack Engineer", bio="Building the future of AI-powered career development",
-        skills=["Python", "TypeScript", "React", "Next.js", "FastAPI", "Docker", "AWS", "PostgreSQL"],
-        preferred_roles=["Senior Engineer", "Staff Engineer", "Tech Lead"],
-        locations=["San Francisco, CA", "Remote", "New York, NY"],
-        experience_level="senior", onboarding_complete=True,
+        id=str(user.id),
+        name=user.name,
+        email=user.email,
+        headline=user.headline,
+        bio=user.bio,
+        skills=user.skills,
+        preferred_roles=user.preferred_roles,
+        locations=user.locations,
+        experience_level=user.experience_level,
+        onboarding_complete=user.onboarding_complete,
     )
 
 
 @router.patch("/profile", response_model=ProfileResponse)
-async def update_profile(update: ProfileUpdate, user_id: str = Body(MOCK_USER_ID)):
+async def update_profile(
+    update: ProfileUpdate,
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = _get_user_id(current_user)
+    user = await UserModel.get(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if update.name is not None:
+        user.name = update.name
+    if update.headline is not None:
+        user.headline = update.headline
+    if update.bio is not None:
+        user.bio = update.bio
+    if update.skills is not None:
+        user.skills = update.skills
+    if update.preferred_roles is not None:
+        user.preferred_roles = update.preferred_roles
+    if update.locations is not None:
+        user.locations = update.locations
+    if update.experience_level is not None:
+        user.experience_level = update.experience_level
+    await user.save()
+
     return ProfileResponse(
-        id=user_id, name=update.name or "Alex Chen", email="alex@example.com",
-        headline=update.headline or "Senior Full Stack Engineer",
-        bio=update.bio or "Building the future of AI-powered career development",
-        skills=update.skills or ["Python", "TypeScript", "React"],
-        preferred_roles=update.preferred_roles or [],
-        locations=update.locations or [],
-        experience_level=update.experience_level or "senior",
-        onboarding_complete=True,
+        id=str(user.id),
+        name=user.name,
+        email=user.email,
+        headline=user.headline,
+        bio=user.bio,
+        skills=user.skills,
+        preferred_roles=user.preferred_roles,
+        locations=user.locations,
+        experience_level=user.experience_level,
+        onboarding_complete=user.onboarding_complete,
     )

@@ -1,11 +1,10 @@
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from pydantic import BaseModel
-from uuid import UUID
 
 
 class ApplicationCreate(BaseModel):
-    job_id: Optional[UUID] = None
+    job_id: Optional[str] = None
     job_title: str
     company: str
     location: Optional[str] = None
@@ -22,8 +21,8 @@ class ApplicationUpdate(BaseModel):
 
 
 class ApplicationResponse(BaseModel):
-    id: UUID
-    job_id: Optional[UUID]
+    id: str
+    job_id: Optional[str]
     job_title: str
     company: str
     location: Optional[str]
@@ -37,7 +36,7 @@ class ApplicationResponse(BaseModel):
 
 
 class NotificationResponse(BaseModel):
-    id: UUID
+    id: str
     type: str
     title: str
     content: Optional[str]
@@ -47,7 +46,7 @@ class NotificationResponse(BaseModel):
 
 
 class SubscriptionResponse(BaseModel):
-    id: UUID
+    id: str
     plan: str
     status: str
     renewal_date: Optional[datetime]
@@ -60,7 +59,7 @@ class SubscriptionUpdate(BaseModel):
 
 
 class ActivityLogResponse(BaseModel):
-    id: UUID
+    id: str
     activity_type: str
     description: Optional[str]
     metadata: Optional[Dict[str, Any]]
