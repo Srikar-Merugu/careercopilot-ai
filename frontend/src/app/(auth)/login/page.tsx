@@ -48,10 +48,12 @@ function LoginContent() {
   const handleCredentialsLogin = async (data: LoginInput) => {
     setAuthError(null);
     try {
-      await login(data.email, data.password);
+      const result = await login(data.email, data.password);
       toast("Access Granted", "Logged in successfully.", "success");
-      router.push(redirect);
-      router.refresh();
+      const dest = result?.user?.onboarding_complete === false
+        ? "/onboarding"
+        : redirect;
+      router.push(dest);
     } catch (err: any) {
       console.error(err);
       const msg = err.message || "Invalid credentials. Try again.";
