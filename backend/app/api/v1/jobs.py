@@ -1,6 +1,6 @@
 import logging
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from backend.app.core.security import get_current_user
 from backend.app.models.job import Job, SavedJob, JobMatch
@@ -58,11 +58,14 @@ async def search_jobs(
     )
 
     all_jobs = []
-    total = 0
+    total_before_pagination = 0
     for provider in get_providers():
-        result = provider.search(filters)
-        all_jobs.extend(result.jobs)
-        total += result.total
+        try:
+            result = provider.search(filters)
+            all_jobs.extend(result.jobs)
+            total_before_pagination += result.total
+        except Exception as e:
+            logger.warning(f"Provider {provider.name} search failed: {e}")
 
     jobs_response = []
     for jd in all_jobs:
@@ -97,11 +100,11 @@ async def search_jobs(
         jobs_response.sort(key=lambda j: j.salary_min or 0)
 
     if days_ago:
-        cutoff = datetime.utcnow() - __import__("datetime").timedelta(days=days_ago)
+        cutoff = datetime.utcnow() - timedelta(days=days_ago)
         jobs_response = [j for j in jobs_response if j.posted_at and j.posted_at >= cutoff]
 
     total = len(jobs_response)
-    total_pages = max(1, (total + per_page - 1) // per_page)
+    total_pages = max(1, (total_before_pagination + per_page - 1) // per_page)
 
     return JobSearchResponse(
         jobs=jobs_response,

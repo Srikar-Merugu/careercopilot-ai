@@ -105,6 +105,11 @@ export default function CareerInsightsPage() {
       if (analysisResult.success) {
         useResumeStore.getState().setCurrentAnalysis(analysisResult.data);
         useAIStore.getState().setCareerInsight(analysisToInsight(analysisResult.data));
+        if (analysisResult.data.parsed_skills?.length) {
+          localStorage.setItem("cc_user_skills", JSON.stringify(analysisResult.data.parsed_skills));
+          localStorage.setItem("cc_user_experience", JSON.stringify(analysisResult.data.parsed_experience || []));
+          localStorage.setItem("cc_user_name", analysisResult.data.parsed_name || "");
+        }
         toast("Resume Analyzed", "AI analysis complete. Insights updated.", "success");
       } else {
         toast("Analysis Failed", "Could not parse resume content. Try a different file.", "error");
