@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Brain,
@@ -16,10 +16,16 @@ import {
   BarChart3,
   Globe,
   Layers,
+  Upload,
+  Check,
+  X,
+  Loader2,
 } from "lucide-react";
 import { useCareerInsight, useRecommendations, useTrendingSkills } from "@/hooks/use-ai";
 import { useAIStore } from "@/store/ai-store";
 import { useResumeStore } from "@/store/resume-store";
+import { resumeService } from "@/services/resume-service";
+import { useToast } from "@/providers/toast-provider";
 import { CareerRadarChart } from "@/components/ai/career-radar-chart";
 import { SkillGapAnalyzer } from "@/components/ai/skill-gap-analyzer";
 import { RecommendationFeed } from "@/components/ai/recommendation-feed";
@@ -54,6 +60,39 @@ export default function CareerInsightsPage() {
   const { isLoading: insightLoading } = useCareerInsight(userSkills, userExperience, userEducation);
   const { isLoading: recsLoading } = useRecommendations(userId, userSkills);
   const { isLoading: trendingLoading } = useTrendingSkills();
+
+  const { toast } = useToast();
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+
+  const handleUpload = useCallback(async (file: File) => {
+    const validTypes = [
+      "application/pdf",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/msword",
+    ];
+    if (!validTypes.includes(file.type)) {
+      toast("Invalid File", "Please upload a PDF or DOCX file.", "error");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast("File Too Large", "Maximum file size is 10MB.", "error");
+      return;
+    }
+    setUploadingFile(true);
+    try {
+      const uploaded = await resumeService.upload(file);
+      const analysisResult = await resumeService.analyze(uploaded.id);
+      if (analysisResult.success) {
+        useResumeStore.getState().setCurrentAnalysis(analysisResult.data);
+        toast("Resume Analyzed", "AI analysis complete. Insights updated.", "success");
+      }
+    } catch (err: any) {
+      toast("Upload Failed", err?.error?.message || "Could not upload resume.", "error");
+    } finally {
+      setUploadingFile(false);
+    }
+  }, [toast]);
 
   return (
     <div className="min-h-screen space-y-6 pb-12">
@@ -312,13 +351,52 @@ export default function CareerInsightsPage() {
                 </div>
               </>
             ) : (
-              <div className="glass-panel rounded-xl p-12 border border-white/10 bg-[#0a0f2e]/60 backdrop-blur-xl text-center">
-                <Brain className="h-12 w-12 text-[#4a5568] mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-white mb-2">Upload Your Resume</h3>
-                <p className="text-sm text-[#a0aec0] max-w-md mx-auto">
-                  Upload your resume in the Resume Intelligence section to get AI-powered career insights,
-                  semantic matching, and personalized recommendations.
-                </p>
+              <div
+                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={async (e) => {
+                  e.preventDefault();
+                  setDragOver(false);
+                  const file = e.dataTransfer.files[0];
+                  if (file) await handleUpload(file);
+                }}
+                className={`glass-panel rounded-xl p-12 border-2 border-dashed text-center transition-all cursor-pointer ${
+                  dragOver
+                    ? "border-primary/70 bg-primary/10"
+                    : "border-white/10 bg-[#0a0f2e]/60 backdrop-blur-xl hover:border-white/20"
+                }`}
+                onClick={() => {
+                  const input = document.createElement("input");
+                  input.type = "file";
+                  input.accept = ".pdf,.docx";
+                  input.onchange = async (e) => {
+                    const file = (e.target as HTMLInputElement).files?.[0];
+                    if (file) await handleUpload(file);
+                  };
+                  input.click();
+                }}
+              >
+                {uploadingFile ? (
+                  <div className="flex flex-col items-center gap-3">
+                    <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                    <p className="text-sm text-[#a0aec0]">Analyzing your resume...</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="h-14 w-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-4">
+                      <Upload className="h-7 w-7 text-primary" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-white mb-2">Upload Your Resume</h3>
+                    <p className="text-sm text-[#a0aec0] max-w-md mx-auto mb-4">
+                      Drop your PDF or DOCX here, or click to browse. Your AI will analyze your skills,
+                      experience, and generate personalized career insights.
+                    </p>
+                    <span className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-white text-sm font-medium transition-all">
+                      <Upload className="h-4 w-4" />
+                      Choose File
+                    </span>
+                  </>
+                )}
               </div>
             )}
           </motion.div>

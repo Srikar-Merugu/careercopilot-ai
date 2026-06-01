@@ -95,15 +95,20 @@ async def analyze_resume(
 
     try:
         file_bytes = None
-        if resume.file_url and not resume.file_url.startswith("local://"):
-            try:
-                from backend.app.services.supabase import supabase_service
-                client = supabase_service.get_client()
-                path = resume.file_url.split("/")[-1]
-                file_data = client.storage.from_("resumes").download(path)
-                file_bytes = file_data
-            except Exception as e:
-                logger.warning(f"Could not download from storage: {e}")
+        if resume.file_url:
+            if resume.file_url.startswith("local://"):
+                local_path = storage_service.get_local_path(resume.file_url)
+                if local_path:
+                    file_bytes = local_path.read_bytes()
+            else:
+                try:
+                    from backend.app.services.supabase import supabase_service
+                    client = supabase_service.get_client()
+                    path = resume.file_url.split("/")[-1]
+                    file_data = client.storage.from_("resumes").download(path)
+                    file_bytes = file_data
+                except Exception as e:
+                    logger.warning(f"Could not download from storage: {e}")
 
         if not file_bytes:
             file_bytes = b"" if not resume.parsed_text else resume.parsed_text.encode()
