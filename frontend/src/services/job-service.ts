@@ -27,6 +27,106 @@ interface RecommendationsResponse {
   recommended_skills: string[];
 }
 
+const FALLBACK_SKILLS = ["JavaScript", "Python", "React", "TypeScript", "Node.js", "HTML", "CSS", "Git"];
+
+function getUserSkills(): string[] {
+  if (typeof window === "undefined") return FALLBACK_SKILLS;
+  try {
+    const fromJobStore = localStorage.getItem("cc_user_skills");
+    if (fromJobStore) {
+      const parsed = JSON.parse(fromJobStore);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+    const fromResumeStore = localStorage.getItem("resume_store_state");
+    if (fromResumeStore) {
+      const state = JSON.parse(fromResumeStore);
+      const analysis = state?.state?.currentAnalysis;
+      if (analysis?.parsed_skills?.length) return analysis.parsed_skills;
+    }
+  } catch {}
+  return FALLBACK_SKILLS;
+}
+
+function getUserExperience(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    const exp = localStorage.getItem("cc_user_experience");
+    if (exp) {
+      const parsed = JSON.parse(exp);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.map((e: any) => `${e.title} at ${e.company} (${e.duration})`).join(", ");
+      }
+    }
+  } catch {}
+  return "";
+}
+
+function normalizeSkill(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9+#.]/g, "");
+}
+
+function calculateMatchScore(userSkills: string[], jobSkills: string[]): {
+  score: number;
+  matched: string[];
+  missing: string[];
+  overlap: number;
+} {
+  if (!jobSkills.length) return { score: 50, matched: [], missing: [], overlap: 0 };
+  if (!userSkills.length) return { score: 20, matched: [], missing: jobSkills, overlap: 0 };
+
+  const normalizedUser = userSkills.map(normalizeSkill);
+  const normalizedJob = jobSkills.map(normalizeSkill);
+
+  const matched: string[] = [];
+  const missing: string[] = [];
+
+  for (let i = 0; i < jobSkills.length; i++) {
+    const js = normalizedJob[i];
+    let found = false;
+    for (const us of normalizedUser) {
+      if (us === js || us.includes(js) || js.includes(us)) {
+        found = true;
+        break;
+      }
+    }
+    if (found) {
+      matched.push(jobSkills[i]);
+    } else {
+      missing.push(jobSkills[i]);
+    }
+  }
+
+  const overlap = matched.length;
+  const rawScore = (overlap / Math.max(jobSkills.length, 1)) * 100;
+
+  const bonus = Math.min(overlap * 3, 15);
+  const finalScore = Math.min(Math.round(rawScore + bonus), 100);
+
+  return { score: finalScore, matched, missing, overlap };
+}
+
+function generateFeedback(
+  score: number,
+  matched: string[],
+  missing: string[],
+  title: string,
+  company: string
+): string {
+  if (matched.length === 0) {
+    return `Upload your resume to see how your skills match this ${title} role at ${company}.`;
+  }
+  const scoreLabel = score >= 80 ? "Excellent" : score >= 60 ? "Strong" : score >= 40 ? "Good" : "Fair";
+  const matchedText = matched.slice(0, 5).join(", ");
+  const missingText = missing.slice(0, 5).join(", ");
+  let feedback = `${scoreLabel} match! Your profile matches ${matched.length} of ${matched.length + missing.length} required skills`;
+  if (matched.length > 0) feedback += ` including ${matchedText}`;
+  if (missing.length > 0) feedback += `. Skills to develop: ${missingText}`;
+  if (score >= 80) feedback += `. You're a top candidate for this role!`;
+  else if (score >= 60) feedback += `. With a few skill upgrades, you'd be an ideal fit.`;
+  else feedback += `. Consider building the missing skills to improve your chances.`;
+  return feedback;
+}
+
 function mockJobToJobData(m: MockJob): JobData {
   return {
     id: m.id,
@@ -50,11 +150,27 @@ function mockJobToJobData(m: MockJob): JobData {
   };
 }
 
-function matchScore(userSkills: string[], jobSkills: string[]): number {
-  if (!jobSkills.length) return 50;
-  const us = new Set(userSkills.map((s) => s.toLowerCase()));
-  const matched = jobSkills.filter((s) => us.has(s.toLowerCase()));
-  return Math.round((matched.length / Math.max(jobSkills.length, 1)) * 100);
+const userSkillsCache = { skills: getUserSkills(), experience: getUserExperience() };
+
+function getMatchDataForJob(job: MockJob, userSkills: string[]): { score: number; matched: string[]; missing: string[] } {
+  const allText = `${job.title} ${job.description} ${job.required_skills.join(" ")} ${job.category}`.toLowerCase();
+  const inferredSkills: string[] = [];
+  const knownTech = [
+    "react", "angular", "vue", "next.js", "node.js", "express", "django", "flask", "fastapi",
+    "python", "java", "javascript", "typescript", "go", "rust", "c++", "c#", "ruby", "php", "scala",
+    "kotlin", "swift", "sql", "postgresql", "mysql", "mongodb", "redis", "graphql", "docker",
+    "kubernetes", "aws", "gcp", "azure", "terraform", "jenkins", "git", "linux", "html", "css",
+    "tailwind", "bootstrap", "sass", "redux", "jest", "cypress", "pytorch", "tensorflow",
+    "machine learning", "deep learning", "nlp", "computer vision", "data science", "pandas",
+    "numpy", "scikit-learn", "tableau", "power bi", "spark", "kafka", "airflow",
+  ];
+  for (const tech of knownTech) {
+    if (allText.includes(tech)) {
+      inferredSkills.push(tech);
+    }
+  }
+  const combinedSkills = [...new Set([...job.required_skills, ...inferredSkills.map(s => s.charAt(0).toUpperCase() + s.slice(1))])];
+  return calculateMatchScore(userSkills, combinedSkills);
 }
 
 export const jobService = {
@@ -73,7 +189,7 @@ export const jobService = {
         return response.data;
       }
     } catch (e) {
-      console.warn("Job search API failed, using fallback mock data:", e);
+      console.warn("Job search API fell back to local data:");
     }
 
     const query = String(params.query || "");
@@ -92,14 +208,8 @@ export const jobService = {
       days_ago: Number(params.days_ago) || 0,
     }, page, perPage);
 
-    const userSkillsStr = typeof window !== "undefined" ? localStorage.getItem("cc_user_skills") : null;
-    const userSkills = userSkillsStr ? JSON.parse(userSkillsStr) as string[] : [];
-
     return {
-      jobs: result.jobs.map((j) => {
-        const job = mockJobToJobData(j);
-        return job;
-      }),
+      jobs: result.jobs.map((j) => mockJobToJobData(j)),
       total: result.total,
       page,
       per_page: perPage,
@@ -112,13 +222,13 @@ export const jobService = {
       const response = await apiClient.get<MatchResponse>(`/jobs/${jobId}/match`);
       return response.data;
     } catch (e) {
-      const userSkillsStr = typeof window !== "undefined" ? localStorage.getItem("cc_user_skills") : null;
-      const userSkills = userSkillsStr ? JSON.parse(userSkillsStr) as string[] : [];
+      const userSkills = getUserSkills();
       const allJobs = searchMockJobs("", {}, 1, 500);
       const job = allJobs.jobs.find((j) => j.id === jobId);
-      const score = job ? matchScore(userSkills, job.required_skills) : 50;
-      const matched = job?.required_skills.filter((s) => userSkills.some((us) => s.toLowerCase().includes(us.toLowerCase()) || us.toLowerCase().includes(s.toLowerCase()))) || [];
-      const missing = job?.required_skills.filter((s) => !matched.includes(s)) || [];
+      if (!job) {
+        return { success: true, data: { job_id: jobId, match_score: 0, matched_skills: [], missing_skills: [], strengths: [], ai_feedback: "Job not found." } };
+      }
+      const { score, matched, missing } = getMatchDataForJob(job, userSkills);
       return {
         success: true,
         data: {
@@ -126,10 +236,8 @@ export const jobService = {
           match_score: score,
           matched_skills: matched,
           missing_skills: missing,
-          strengths: job?.required_skills.slice(0, 3) || [],
-          ai_feedback: matched.length > 0
-            ? `Your profile matches ${matched.length} of ${job?.required_skills.length || 0} required skills, giving you a ${score}% compatibility score.`
-            : "Upload your resume for a personalized AI match analysis.",
+          strengths: matched.slice(0, 3),
+          ai_feedback: generateFeedback(score, matched, missing, job.title, job.company),
         },
       };
     }
@@ -171,7 +279,7 @@ export const jobService = {
           job: mockJobToJobData(job),
           saved_at: new Date().toISOString(),
         } : null;
-      }).filter(Boolean);
+      }).filter(Boolean) as SavedJobItem[];
       return { success: true, data };
     }
   },
@@ -181,26 +289,28 @@ export const jobService = {
       const response = await apiClient.get<RecommendationsResponse>("/jobs/recommendations");
       return response.data;
     } catch (e) {
-      const userSkillsStr = typeof window !== "undefined" ? localStorage.getItem("cc_user_skills") : null;
-      const userSkills = userSkillsStr ? JSON.parse(userSkillsStr) as string[] : [];
+      const userSkills = getUserSkills();
       const allJobs = searchMockJobs("", {}, 1, 500);
-      const scored = allJobs.jobs.map((j) => ({
-        job: mockJobToJobData(j),
-        match: {
-          job_id: j.id,
-          match_score: matchScore(userSkills, j.required_skills),
-          matched_skills: j.required_skills.filter((s) => userSkills.some((us) => s.toLowerCase().includes(us.toLowerCase()))),
-          missing_skills: [],
-          strengths: [],
-          ai_feedback: "",
-        },
-      }));
+      const scored = allJobs.jobs.map((j) => {
+        const { score, matched, missing } = getMatchDataForJob(j, userSkills);
+        return {
+          job: mockJobToJobData(j),
+          match: {
+            job_id: j.id,
+            match_score: score,
+            matched_skills: matched,
+            missing_skills: missing,
+            strengths: matched.slice(0, 3),
+            ai_feedback: generateFeedback(score, matched, missing, j.title, j.company),
+          },
+        };
+      });
       scored.sort((a, b) => b.match.match_score - a.match.match_score);
       return {
         matched_jobs: scored.slice(0, 10),
         trending_jobs: scored.slice(0, 10),
         similar_jobs: scored.slice(0, 10),
-        recommended_skills: ["TypeScript", "React", "Python", "Docker", "AWS", "GraphQL", "Next.js", "Kubernetes"],
+        recommended_skills: [...new Set(scored.slice(0, 20).flatMap((s) => s.match.missing_skills))].slice(0, 10),
       };
     }
   },

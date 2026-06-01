@@ -4,171 +4,81 @@ from typing import Optional
 from backend.app.services.job_providers.base import BaseJobProvider, JobData, SearchFilters, SearchResult
 
 
-ROLE_TEMPLATES = [
-    {
-        "title": "Senior Frontend Engineer",
-        "company": "TechVista Inc",
-        "skills": ["React", "TypeScript", "Next.js", "TailwindCSS", "GraphQL", "Storybook", "Jest"],
-        "min_salary": 130000,
-        "max_salary": 180000,
-        "experience": "5-7 years",
-        "remote": "remote",
-    },
-    {
-        "title": "Backend Engineer",
-        "company": "DataFlow Systems",
-        "skills": ["Python", "FastAPI", "PostgreSQL", "Redis", "Docker", "Kubernetes", "AWS"],
-        "min_salary": 120000,
-        "max_salary": 170000,
-        "experience": "3-5 years",
-        "remote": "hybrid",
-    },
-    {
-        "title": "Full Stack Developer",
-        "company": "NovaTech Solutions",
-        "skills": ["React", "Node.js", "TypeScript", "MongoDB", "Express", "Docker", "AWS"],
-        "min_salary": 110000,
-        "max_salary": 160000,
-        "experience": "3-5 years",
-        "remote": "remote",
-    },
-    {
-        "title": "AI/ML Engineer",
-        "company": "CognitiCore AI",
-        "skills": ["Python", "TensorFlow", "PyTorch", "NLP", "LangChain", "OpenAI", "RAG", "Vector Databases"],
-        "min_salary": 150000,
-        "max_salary": 220000,
-        "experience": "4-7 years",
-        "remote": "remote",
-    },
-    {
-        "title": "DevOps Engineer",
-        "company": "CloudBridge Infrastructure",
-        "skills": ["Docker", "Kubernetes", "Terraform", "AWS", "CI/CD", "Linux", "Prometheus", "Grafana"],
-        "min_salary": 125000,
-        "max_salary": 175000,
-        "experience": "4-6 years",
-        "remote": "hybrid",
-    },
-    {
-        "title": "Data Analyst",
-        "company": "InsightLab Analytics",
-        "skills": ["SQL", "Python", "Tableau", "Power BI", "Excel", "Statistics", "Pandas", "NumPy"],
-        "min_salary": 85000,
-        "max_salary": 130000,
-        "experience": "2-4 years",
-        "remote": "remote",
-    },
-    {
-        "title": "UI/UX Designer",
-        "company": "PixelPerfect Studio",
-        "skills": ["Figma", "Adobe XD", "User Research", "Prototyping", "Design Systems", "CSS", "HTML"],
-        "min_salary": 95000,
-        "max_salary": 145000,
-        "experience": "3-5 years",
-        "remote": "hybrid",
-    },
-    {
-        "title": "Product Manager",
-        "company": "GrowthHarbor",
-        "skills": ["Product Strategy", "Roadmapping", "A/B Testing", "Analytics", "Agile", "JIRA", "SQL"],
-        "min_salary": 120000,
-        "max_salary": 175000,
-        "experience": "5-7 years",
-        "remote": "on-site",
-    },
-    {
-        "title": "Mobile Developer (React Native)",
-        "company": "AppForge Mobile",
-        "skills": ["React Native", "TypeScript", "iOS", "Android", "Redux", "Firebase", "Expo"],
-        "min_salary": 110000,
-        "max_salary": 160000,
-        "experience": "3-5 years",
-        "remote": "remote",
-    },
-    {
-        "title": "Data Engineer",
-        "company": "StreamLine Data",
-        "skills": ["Python", "Spark", "Airflow", "Snowflake", "dbt", "AWS", "Kafka", "SQL"],
-        "min_salary": 130000,
-        "max_salary": 185000,
-        "experience": "4-6 years",
-        "remote": "hybrid",
-    },
-    {
-        "title": "Frontend Developer",
-        "company": "WebCraft Digital",
-        "skills": ["JavaScript", "React", "CSS", "HTML", "TypeScript", "Webpack", "REST APIs"],
-        "min_salary": 90000,
-        "max_salary": 140000,
-        "experience": "2-4 years",
-        "remote": "on-site",
-    },
-    {
-        "title": "Solutions Architect",
-        "company": "EnterpriseScale Inc",
-        "skills": ["System Design", "AWS", "Microservices", "Docker", "Kubernetes", "Python", "Java", "Leadership"],
-        "min_salary": 160000,
-        "max_salary": 230000,
-        "experience": "7-10 years",
-        "remote": "hybrid",
-    },
-    {
-        "title": "Cybersecurity Engineer",
-        "company": "SecureShield Corp",
-        "skills": ["Penetration Testing", "Network Security", "Python", "AWS Security", "IAM", "Compliance", "SIEM"],
-        "min_salary": 130000,
-        "max_salary": 190000,
-        "experience": "4-7 years",
-        "remote": "on-site",
-    },
-    {
-        "title": "Junior Software Engineer",
-        "company": "CodeLaunch Startups",
-        "skills": ["JavaScript", "Python", "React", "Git", "SQL", "HTML", "CSS"],
-        "min_salary": 70000,
-        "max_salary": 100000,
-        "experience": "0-2 years",
-        "remote": "on-site",
-    },
-    {
-        "title": "Technical Writer",
-        "company": "DocuCraft AI",
-        "skills": ["Technical Writing", "Documentation", "API Documentation", "Markdown", "Git", "Developer Tools"],
-        "min_salary": 80000,
-        "max_salary": 120000,
-        "experience": "2-4 years",
-        "remote": "remote",
-    },
+INDIAN_ROLE_TEMPLATES = [
+    {"title": "Senior Frontend Engineer", "company": "Swiggy", "skills": ["React", "TypeScript", "Next.js", "TailwindCSS", "GraphQL", "Jest"], "min_salary": 2500000, "max_salary": 4500000, "experience": "5-7 years", "remote": "hybrid"},
+    {"title": "Backend Engineer", "company": "Razorpay", "skills": ["Python", "FastAPI", "PostgreSQL", "Redis", "Docker", "Kubernetes", "AWS"], "min_salary": 2000000, "max_salary": 4000000, "experience": "3-5 years", "remote": "hybrid"},
+    {"title": "Full Stack Developer", "company": "Flipkart", "skills": ["React", "Node.js", "TypeScript", "MongoDB", "Express", "Docker", "AWS"], "min_salary": 1800000, "max_salary": 3500000, "experience": "3-5 years", "remote": "on-site"},
+    {"title": "AI/ML Engineer", "company": "Zerodha", "skills": ["Python", "TensorFlow", "PyTorch", "NLP", "LangChain", "RAG", "Vector Databases"], "min_salary": 3000000, "max_salary": 6000000, "experience": "4-7 years", "remote": "remote"},
+    {"title": "DevOps Engineer", "company": "BrowserStack", "skills": ["Docker", "Kubernetes", "Terraform", "AWS", "CI/CD", "Linux", "Prometheus"], "min_salary": 2000000, "max_salary": 4000000, "experience": "4-6 years", "remote": "remote"},
+    {"title": "Data Analyst", "company": "CRED", "skills": ["SQL", "Python", "Tableau", "Power BI", "Excel", "Statistics", "Pandas"], "min_salary": 1200000, "max_salary": 2500000, "experience": "2-4 years", "remote": "hybrid"},
+    {"title": "UI/UX Designer", "company": "Zomato", "skills": ["Figma", "Adobe XD", "User Research", "Prototyping", "Design Systems", "CSS"], "min_salary": 1500000, "max_salary": 3000000, "experience": "3-5 years", "remote": "on-site"},
+    {"title": "Product Manager", "company": "Ola", "skills": ["Product Strategy", "Roadmapping", "A/B Testing", "Analytics", "Agile", "JIRA", "SQL"], "min_salary": 2500000, "max_salary": 5000000, "experience": "5-7 years", "remote": "on-site"},
+    {"title": "Mobile Developer (React Native)", "company": "PhonePe", "skills": ["React Native", "TypeScript", "iOS", "Android", "Redux", "Firebase", "Expo"], "min_salary": 1800000, "max_salary": 3500000, "experience": "3-5 years", "remote": "hybrid"},
+    {"title": "Data Engineer", "company": "Dream11", "skills": ["Python", "Spark", "Airflow", "Snowflake", "dbt", "AWS", "Kafka", "SQL"], "min_salary": 2200000, "max_salary": 4500000, "experience": "4-6 years", "remote": "remote"},
+    {"title": "Frontend Developer", "company": "Myntra", "skills": ["JavaScript", "React", "CSS", "HTML", "TypeScript", "Webpack", "REST APIs"], "min_salary": 1200000, "max_salary": 2500000, "experience": "2-4 years", "remote": "on-site"},
+    {"title": "Solutions Architect", "company": "Infosys", "skills": ["System Design", "AWS", "Microservices", "Docker", "Kubernetes", "Python", "Java"], "min_salary": 3000000, "max_salary": 5500000, "experience": "7-10 years", "remote": "hybrid"},
+    {"title": "SDE I", "company": "Google India", "skills": ["Java", "Python", "Data Structures", "Algorithms", "System Design", "SQL", "Docker"], "min_salary": 3500000, "max_salary": 6000000, "experience": "0-2 years", "remote": "on-site"},
+    {"title": "SDE II", "company": "Microsoft India", "skills": ["C++", "C#", "Python", "Azure", "Kubernetes", "Microservices", "SQL"], "min_salary": 4000000, "max_salary": 7000000, "experience": "3-5 years", "remote": "hybrid"},
+    {"title": "Software Engineer", "company": "TCS Digital", "skills": ["Java", "Spring Boot", "Microservices", "SQL", "Angular", "Docker", "AWS"], "min_salary": 800000, "max_salary": 1800000, "experience": "2-5 years", "remote": "on-site"},
+    {"title": "Software Developer", "company": "Wipro", "skills": ["Python", "Django", "PostgreSQL", "React", "Docker", "Git", "AWS"], "min_salary": 600000, "max_salary": 1500000, "experience": "1-3 years", "remote": "on-site"},
+    {"title": "Senior Software Engineer", "company": "Paytm", "skills": ["Java", "Spring Boot", "Kafka", "Redis", "MySQL", "Docker", "Kubernetes"], "min_salary": 2500000, "max_salary": 4500000, "experience": "5-8 years", "remote": "on-site"},
+    {"title": "Data Scientist", "company": "Tata Consultancy Services", "skills": ["Python", "Machine Learning", "Statistics", "SQL", "TensorFlow", "Deep Learning", "NLP"], "min_salary": 1500000, "max_salary": 3500000, "experience": "3-6 years", "remote": "hybrid"},
+    {"title": "React Developer", "company": "Urban Company", "skills": ["React", "TypeScript", "Redux", "JavaScript", "CSS", "HTML", "REST APIs", "Git"], "min_salary": 1400000, "max_salary": 2800000, "experience": "2-4 years", "remote": "remote"},
+    {"title": "Node.js Backend Developer", "company": "ShareChat", "skills": ["Node.js", "Express", "PostgreSQL", "Redis", "MongoDB", "Docker", "AWS"], "min_salary": 1600000, "max_salary": 3200000, "experience": "3-5 years", "remote": "remote"},
+    {"title": "Junior Software Engineer", "company": "HackerRank", "skills": ["JavaScript", "Python", "React", "Git", "SQL", "HTML", "CSS"], "min_salary": 700000, "max_salary": 1400000, "experience": "0-2 years", "remote": "remote"},
+    {"title": "Python Developer", "company": "Juspay", "skills": ["Python", "Django", "FastAPI", "PostgreSQL", "Redis", "Docker", "AWS"], "min_salary": 1200000, "max_salary": 2500000, "experience": "2-4 years", "remote": "hybrid"},
+    {"title": "Technical Writer", "company": "Postman", "skills": ["Technical Writing", "Documentation", "API Documentation", "Markdown", "Git"], "min_salary": 1000000, "max_salary": 2000000, "experience": "2-4 years", "remote": "remote"},
+    {"title": "QA Engineer", "company": "BrowserStack", "skills": ["Selenium", "Python", "Automation Testing", "Cypress", "API Testing", "Postman", "Git"], "min_salary": 800000, "max_salary": 1800000, "experience": "2-4 years", "remote": "hybrid"},
+    {"title": "Machine Learning Engineer", "company": "Observe.ai", "skills": ["Python", "TensorFlow", "PyTorch", "MLOps", "Docker", "Kubernetes", "AWS", "MLflow"], "min_salary": 2500000, "max_salary": 5000000, "experience": "3-6 years", "remote": "remote"},
+    {"title": "Cybersecurity Engineer", "company": "Quick Heal", "skills": ["Penetration Testing", "Network Security", "Python", "AWS Security", "IAM", "Compliance"], "min_salary": 1800000, "max_salary": 3500000, "experience": "4-7 years", "remote": "on-site"},
+    {"title": "Engineering Manager", "company": "Razorpay", "skills": ["Engineering Management", "System Design", "Microservices", "Java", "Python", "Leadership", "Agile"], "min_salary": 5000000, "max_salary": 8000000, "experience": "8-12 years", "remote": "on-site"},
+    {"title": "Technical Lead", "company": "Gojek India", "skills": ["System Design", "Java", "Kotlin", "Microservices", "Docker", "Kubernetes", "Leadership"], "min_salary": 3500000, "max_salary": 6000000, "experience": "6-9 years", "remote": "hybrid"},
+    {"title": "Software Development Intern", "company": "Practo", "skills": ["Python", "JavaScript", "React", "SQL", "Git", "HTML", "CSS"], "min_salary": 300000, "max_salary": 600000, "experience": "0-1 years", "remote": "on-site"},
+    {"title": "Cloud Architect", "company": "Zeta", "skills": ["AWS", "Azure", "GCP", "Terraform", "Kubernetes", "Microservices", "System Design"], "min_salary": 4000000, "max_salary": 7000000, "experience": "7-12 years", "remote": "hybrid"},
 ]
 
-COMPANIES = [
-    "TechVista Inc", "DataFlow Systems", "NovaTech Solutions", "CognitiCore AI",
-    "CloudBridge Infrastructure", "InsightLab Analytics", "PixelPerfect Studio",
-    "GrowthHarbor", "AppForge Mobile", "StreamLine Data", "WebCraft Digital",
-    "EnterpriseScale Inc", "SecureShield Corp", "CodeLaunch Startups", "DocuCraft AI",
-    "QuantumByte Labs", "NexGen Software", "Apex Digital Solutions", "Vertex AI",
-    "StratoCloud Services", "BrightPath Analytics", "BlueCore Systems",
+INDIAN_COMPANIES = [
+    "Google India", "Microsoft India", "Amazon India", "Flipkart", "Swiggy", "Zomato",
+    "Razorpay", "CRED", "Zerodha", "PhonePe", "Paytm", "Ola", "Uber India",
+    "Myntra", "Nykaa", "Urban Company", "ShareChat", "Dream11", "BrowserStack",
+    "Postman", "HackerRank", "TCS Digital", "Infosys", "Wipro", "HCL Tech",
+    "Tech Mahindra", "LTI Mindtree", "Persistent Systems", "Zeta", "Groww",
+    "Upstox", "BharatPe", "Meesho", "Unacademy", "BYJU'S", "Practo",
+    "Freshworks", "Chargebee", "Whatfix", "Observe.ai", "Juspay", "Hasura",
 ]
 
-LOCATIONS = [
-    "San Francisco, CA", "New York, NY", "Austin, TX", "Seattle, WA",
-    "Boston, MA", "Chicago, IL", "Denver, CO", "Los Angeles, CA",
-    "Portland, OR", "Atlanta, GA", "Miami, FL", "Dallas, TX",
-    "Remote - US", "Remote - Global", "San Jose, CA", "Toronto, Canada",
+INDIAN_CITIES = [
+    "Bangalore", "Hyderabad", "Chennai", "Mumbai", "Pune", "Delhi", "Gurgaon",
+    "Noida", "Kolkata", "Ahmedabad", "Jaipur", "Chandigarh", "Indore",
+    "Kochi", "Coimbatore", "Thiruvananthapuram", "Visakhapatnam", "Nagpur",
 ]
 
-JOB_TYPES = ["full_time", "contract", "part_time"]
+INDIAN_REMOTE_CITIES = [
+    "Remote - India", "Bangalore", "Hyderabad", "Chennai", "Mumbai", "Pune",
+    "Delhi", "Gurgaon", "Noida",
+]
+
+APPLY_URL_PREFIXES = [
+    "https://www.linkedin.com/jobs/view",
+    "https://www.naukri.com/job",
+    "https://wellfound.com/jobs",
+    "https://internshala.com/internship",
+    "https://instahyre.com/job",
+    "https://cutshort.com/job",
+    "https://hasjob.co/job",
+    "https://www.freshersworld.com/jobs",
+    "https://www.timesjobs.com/job",
+    "https://www.monsterindia.com/job",
+]
+
+JOB_TYPES = ["full_time", "contract", "internship"]
 REMOTE_TYPES = ["remote", "hybrid", "on-site"]
-CATEGORIES = [
-    "Engineering", "Design", "Product", "Data", "DevOps",
-    "Security", "AI/ML", "Mobile", "Management", "Support",
-]
+CATEGORIES = ["Engineering", "Design", "Product", "Data", "DevOps", "Security", "AI/ML", "Mobile", "Management"]
 
 
 class MockJobProvider(BaseJobProvider):
     def __init__(self):
-        self._jobs = self._generate_jobs(500)
+        self._jobs = self._generate_jobs(300)
 
     @property
     def name(self) -> str:
@@ -230,26 +140,33 @@ class MockJobProvider(BaseJobProvider):
     def _generate_jobs(self, count: int) -> list[JobData]:
         jobs = []
         for i in range(count):
-            template = random.choice(ROLE_TEMPLATES)
-            company = template["company"] if random.random() < 0.7 else random.choice(COMPANIES)
-            location = random.choice(LOCATIONS)
-            remote = random.choice(REMOTE_TYPES)
+            template = random.choice(INDIAN_ROLE_TEMPLATES)
+            company = template["company"] if random.random() < 0.7 else random.choice(INDIAN_COMPANIES)
+            location = random.choice(INDIAN_CITIES)
+            if template.get("remote") == "remote":
+                location = "Remote - India"
+            elif template.get("remote") == "hybrid":
+                location = random.choice(INDIAN_REMOTE_CITIES)
+            remote = template.get("remote", random.choice(REMOTE_TYPES))
             job_type = random.choice(JOB_TYPES)
             category = random.choice(CATEGORIES)
 
-            salary_min = template["min_salary"] + random.randint(-20000, 20000)
-            salary_max = template["max_salary"] + random.randint(-20000, 20000)
-            salary_min = max(salary_min, 30000)
-            salary_max = max(salary_max, salary_min + 10000)
+            salary_min = template["min_salary"] + random.randint(-300000, 300000)
+            salary_max = template["max_salary"] + random.randint(-300000, 300000)
+            salary_min = max(salary_min, 200000)
+            salary_max = max(salary_max, salary_min + 100000)
 
-            days_ago = random.randint(0, 60)
+            days_ago = random.randint(0, 30)
             posted = datetime.utcnow() - timedelta(days=days_ago)
+
+            apply_id = random.randint(100000, 999999)
+            apply_url = f"{random.choice(APPLY_URL_PREFIXES)}/{apply_id}"
 
             desc = (
                 f"We are looking for a talented {template['title']} to join {company}. "
                 f"In this role, you will design, build, and maintain cutting-edge solutions "
-                f"that impact millions of users. You'll work with a world-class team using "
-                f"modern technologies and agile methodologies.\n\n"
+                f"that impact millions of users across India. You'll work with a world-class team "
+                f"using modern technologies and agile methodologies.\n\n"
                 f"Key Responsibilities:\n"
                 f"- Design and implement scalable solutions\n"
                 f"- Collaborate with cross-functional teams\n"
@@ -270,14 +187,14 @@ class MockJobProvider(BaseJobProvider):
                 location=location,
                 salary_min=salary_min,
                 salary_max=salary_max,
-                salary_currency="USD",
+                salary_currency="INR",
                 description=desc,
                 requirements=desc[:300],
                 required_skills=template["skills"][:],
                 experience_required=template["experience"],
                 job_type=job_type,
                 remote_type=remote,
-                apply_url=f"https://careercopilot.ai/apply/{company.lower().replace(' ', '-')}/{template['title'].lower().replace(' ', '-')}",
+                apply_url=apply_url,
                 category=category,
                 posted_at=posted,
             ))

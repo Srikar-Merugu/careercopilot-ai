@@ -69,10 +69,17 @@ export default function JobDetailPage() {
     }
   };
 
-  const formatSalary = (min?: number, max?: number) => {
+  const formatSalary = (min?: number, max?: number, currency?: string) => {
     if (!min && !max) return null;
-    const fmt = (n: number) =>
-      "$" + (n >= 1000 ? Math.round(n / 1000) + "k" : n.toString());
+    const isINR = currency === "INR" || (min ?? 0) >= 100000;
+    const fmt = (n: number) => {
+      if (isINR) {
+        if (n >= 10000000) return `₹${(n / 10000000).toFixed(1)}Cr`;
+        if (n >= 100000) return `₹${Math.round(n / 100000)}L`;
+        return `₹${n.toLocaleString("en-IN")}`;
+      }
+      return "$" + (n >= 1000 ? Math.round(n / 1000) + "k" : n.toString());
+    };
     if (min && max) return `${fmt(min)} - ${fmt(max)}`;
     if (min) return `From ${fmt(min)}`;
     if (max) return `Up to ${fmt(max)}`;
@@ -141,10 +148,10 @@ export default function JobDetailPage() {
                         {job.location}
                       </span>
                     )}
-                    {formatSalary(job.salary_min, job.salary_max) && (
+                    {formatSalary(job.salary_min, job.salary_max, job.salary_currency) && (
                       <span className="flex items-center gap-1.5 text-xs text-emerald-400 font-medium">
                         <DollarSign className="h-3.5 w-3.5" />
-                        {formatSalary(job.salary_min, job.salary_max)}
+                        {formatSalary(job.salary_min, job.salary_max, job.salary_currency)}
                       </span>
                     )}
                     {daysAgo !== null && (

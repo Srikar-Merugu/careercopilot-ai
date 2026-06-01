@@ -29,7 +29,10 @@ class AdzunaJobProvider(BaseJobProvider):
             return SearchResult(jobs=[], total=0, page=filters.page, per_page=filters.per_page)
 
         try:
-            country = "us"
+            country = filters.location and "gb" or "in"
+            country = "in"
+            if filters.location and any(c in filters.location.lower() for c in ["us", "usa", "united states", "europe", "london", "uk"]):
+                country = "gb"
             url = f"{self.BASE_URL}/{country}/search/{filters.page}"
 
             params = {
@@ -37,7 +40,7 @@ class AdzunaJobProvider(BaseJobProvider):
                 "app_key": self.app_key,
                 "results_per_page": min(filters.per_page, 50),
                 "what": filters.query or "",
-                "where": filters.location or "",
+                "where": (filters.location or "").replace("india", "").strip() or "India",
                 "content-type": "application/json",
             }
 

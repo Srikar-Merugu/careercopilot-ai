@@ -15,7 +15,7 @@ from backend.app.services.job_providers.adzuna_provider import AdzunaJobProvider
 from backend.app.services.ai_matching_service import ai_matching_service
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/jobs", tags=["job-search"])
+router = APIRouter(tags=["job-search"])
 
 adzuna_provider = AdzunaJobProvider()
 
