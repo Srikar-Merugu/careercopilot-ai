@@ -17,8 +17,10 @@ import { motion } from "framer-motion";
 
 export default function SignupPage() {
   const router = useRouter();
-  const { signUp, isLoading } = useAuthStore();
+  const { signUp, isLoading, setLoading } = useAuthStore();
   const { toast } = useToast();
+
+  useEffect(() => { setLoading(false); }, [setLoading]);
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
