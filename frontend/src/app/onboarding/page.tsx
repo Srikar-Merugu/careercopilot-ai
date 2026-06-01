@@ -527,7 +527,7 @@ export default function OnboardingPage() {
                   </div>
 
                   <div className="flex flex-wrap gap-2 justify-center">
-                    {PREFERRED_ROLES.map((role) => (
+                    {PREFERRED_ROLES.slice(0, 6).map((role) => (
                       <PillToggle
                         key={role}
                         label={role}
@@ -553,6 +553,35 @@ export default function OnboardingPage() {
                           {selectedRoles.join(", ")}
                         </span>
                       </p>
+                    </motion.div>
+                  )}
+
+                  {selectedRoles.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      transition={{ duration: 0.4, ease: "easeOut" }}
+                      className="overflow-hidden"
+                    >
+                      <div className="border-t border-white/[0.06] pt-5 space-y-3">
+                        <p className="text-[10px] text-[#a0aec0] uppercase tracking-wider font-mono text-center">
+                          More specialized roles
+                        </p>
+                        <div className="flex flex-wrap gap-2 justify-center">
+                          {PREFERRED_ROLES.slice(6).map((role) => (
+                            <PillToggle
+                              key={role}
+                              label={role}
+                              selected={selectedRoles.includes(role)}
+                              onClick={() => {
+                                if (selectedRoles.includes(role)) toggleRole(role);
+                                else if (selectedRoles.length < 4) toggleRole(role);
+                                else toast("Limit Reached", "Select up to 4 roles.", "info");
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </div>
                     </motion.div>
                   )}
                 </div>
