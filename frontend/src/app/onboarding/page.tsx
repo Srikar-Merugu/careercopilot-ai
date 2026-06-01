@@ -517,79 +517,46 @@ export default function OnboardingPage() {
               )}
 
               {/* ── STEP 3: Preferred Roles ───────────────────────── */}
-              {step === 3 && (() => {
-                const visibleCount = selectedRoles.length === 0 ? 4 : Math.min(4 + selectedRoles.length * 2, PREFERRED_ROLES.length);
-                const remaining = PREFERRED_ROLES.slice(visibleCount);
-                return (
-                  <div className="space-y-6">
-                    <div className="text-center space-y-2">
-                      <h2 className="text-2xl font-extrabold tracking-tight">What roles excite you?</h2>
-                      <p className="text-[#a0aec0] text-sm">
-                        Pick up to 4 roles. Your AI will prioritize matching opportunities.
-                      </p>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2 justify-center">
-                      {PREFERRED_ROLES.slice(0, visibleCount).map((role) => (
-                        <PillToggle
-                          key={role}
-                          label={role}
-                          selected={selectedRoles.includes(role)}
-                          onClick={() => {
-                            if (selectedRoles.includes(role)) toggleRole(role);
-                            else if (selectedRoles.length < 4) toggleRole(role);
-                            else toast("Limit Reached", "Select up to 4 roles.", "info");
-                          }}
-                        />
-                      ))}
-                    </div>
-
-                    {selectedRoles.length > 0 && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="p-3 rounded-xl bg-[#7C3AED]/10 border border-[#7C3AED]/20 text-center"
-                      >
-                        <p className="text-xs text-[#a0aec0]">
-                          Selected:{" "}
-                          <span className="text-white font-semibold">
-                            {selectedRoles.join(", ")}
-                          </span>
-                        </p>
-                      </motion.div>
-                    )}
-
-                    {selectedRoles.length > 0 && remaining.length > 0 && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        transition={{ duration: 0.4, ease: "easeOut" }}
-                        className="overflow-hidden"
-                      >
-                        <div className="border-t border-white/[0.06] pt-5 space-y-3">
-                          <p className="text-[10px] text-[#a0aec0] uppercase tracking-wider font-mono text-center">
-                            More specialized roles
-                          </p>
-                          <div className="flex flex-wrap gap-2 justify-center">
-                            {remaining.map((role) => (
-                              <PillToggle
-                                key={role}
-                                label={role}
-                                selected={selectedRoles.includes(role)}
-                                onClick={() => {
-                                  if (selectedRoles.includes(role)) toggleRole(role);
-                                  else if (selectedRoles.length < 4) toggleRole(role);
-                                  else toast("Limit Reached", "Select up to 4 roles.", "info");
-                                }}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
+              {step === 3 && (
+                <div className="space-y-6">
+                  <div className="text-center space-y-2">
+                    <h2 className="text-2xl font-extrabold tracking-tight">What roles excite you?</h2>
+                    <p className="text-[#a0aec0] text-sm">
+                      Pick up to 4 roles. Your AI will prioritize matching opportunities.
+                    </p>
                   </div>
-                );
-              })()}
+
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {PREFERRED_ROLES.slice(0, selectedRoles.length === 0 ? 4 : Math.min(4 + selectedRoles.length * 2, PREFERRED_ROLES.length)).map((role) => (
+                      <PillToggle
+                        key={role}
+                        label={role}
+                        selected={selectedRoles.includes(role)}
+                        onClick={() => {
+                          if (selectedRoles.includes(role)) toggleRole(role);
+                          else if (selectedRoles.length < 4) toggleRole(role);
+                          else toast("Limit Reached", "Select up to 4 roles.", "info");
+                        }}
+                      />
+                    ))}
+                  </div>
+
+                  {selectedRoles.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="p-3 rounded-xl bg-[#7C3AED]/10 border border-[#7C3AED]/20 text-center"
+                    >
+                      <p className="text-xs text-[#a0aec0]">
+                        Selected:{" "}
+                        <span className="text-white font-semibold">
+                          {selectedRoles.join(", ")}
+                        </span>
+                      </p>
+                    </motion.div>
+                  )}
+                </div>
+              )}
 
               {/* ── STEP 4: Experience Level ──────────────────────── */}
               {step === 4 && (
@@ -629,146 +596,82 @@ export default function OnboardingPage() {
               )}
 
               {/* ── STEP 5: Locations ─────────────────────────────── */}
-              {step === 5 && (() => {
-                const visibleCount = selectedLocations.length === 0 ? 5 : Math.min(5 + selectedLocations.length * 2, LOCATIONS.length);
-                const remaining = LOCATIONS.slice(visibleCount);
-                return (
-                  <div className="space-y-6">
-                    <div className="text-center space-y-2">
-                      <h2 className="text-2xl font-extrabold tracking-tight">Where do you want to work?</h2>
-                      <p className="text-[#a0aec0] text-sm">
-                        Pick up to 5 preferred locations — "Remote" is always an option.
-                      </p>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2 justify-center">
-                      {LOCATIONS.slice(0, visibleCount).map((loc) => (
-                        <PillToggle
-                          key={loc}
-                          label={loc}
-                          selected={selectedLocations.includes(loc)}
-                          onClick={() => {
-                            if (selectedLocations.includes(loc)) toggleLocation(loc);
-                            else if (selectedLocations.length < 5) toggleLocation(loc);
-                            else toast("Limit Reached", "Select up to 5 locations.", "info");
-                          }}
-                        />
-                      ))}
-                    </div>
-
-                    {selectedLocations.length > 0 && (
-                      <>
-                        <motion.div
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="flex flex-wrap gap-1.5 justify-center"
-                        >
-                          {selectedLocations.map((loc) => (
-                            <span
-                              key={loc}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#06B6D4]/10 border border-[#06B6D4]/25 text-[10px] text-[#06B6D4] font-semibold"
-                            >
-                              <MapPin className="h-2.5 w-2.5" />
-                              {loc}
-                              <button onClick={() => toggleLocation(loc)}>
-                                <X className="h-2.5 w-2.5 ml-0.5 hover:text-white" />
-                              </button>
-                            </span>
-                          ))}
-                        </motion.div>
-
-                        {remaining.length > 0 && (
-                          <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: "auto" }}
-                            transition={{ duration: 0.4, ease: "easeOut" }}
-                            className="overflow-hidden"
-                          >
-                            <div className="border-t border-white/[0.06] pt-5 space-y-3">
-                              <p className="text-[10px] text-[#a0aec0] uppercase tracking-wider font-mono text-center">
-                                More locations
-                              </p>
-                              <div className="flex flex-wrap gap-2 justify-center">
-                                {remaining.map((loc) => (
-                                  <PillToggle
-                                    key={loc}
-                                    label={loc}
-                                    selected={selectedLocations.includes(loc)}
-                                    onClick={() => {
-                                      if (selectedLocations.includes(loc)) toggleLocation(loc);
-                                      else if (selectedLocations.length < 5) toggleLocation(loc);
-                                      else toast("Limit Reached", "Select up to 5 locations.", "info");
-                                    }}
-                                  />
-                                ))}
-                              </div>
-                            </div>
-                          </motion.div>
-                        )}
-                      </>
-                    )}
+              {step === 5 && (
+                <div className="space-y-6">
+                  <div className="text-center space-y-2">
+                    <h2 className="text-2xl font-extrabold tracking-tight">Where do you want to work?</h2>
+                    <p className="text-[#a0aec0] text-sm">
+                      Pick up to 5 preferred locations — "Remote" is always an option.
+                    </p>
                   </div>
-                );
-              })()}
+
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {LOCATIONS.slice(0, selectedLocations.length === 0 ? 5 : Math.min(5 + selectedLocations.length * 2, LOCATIONS.length)).map((loc) => (
+                      <PillToggle
+                        key={loc}
+                        label={loc}
+                        selected={selectedLocations.includes(loc)}
+                        onClick={() => {
+                          if (selectedLocations.includes(loc)) toggleLocation(loc);
+                          else if (selectedLocations.length < 5) toggleLocation(loc);
+                          else toast("Limit Reached", "Select up to 5 locations.", "info");
+                        }}
+                      />
+                    ))}
+                  </div>
+
+                  {selectedLocations.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="flex flex-wrap gap-1.5 justify-center"
+                    >
+                      {selectedLocations.map((loc) => (
+                        <span
+                          key={loc}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#06B6D4]/10 border border-[#06B6D4]/25 text-[10px] text-[#06B6D4] font-semibold"
+                        >
+                          <MapPin className="h-2.5 w-2.5" />
+                          {loc}
+                          <button onClick={() => toggleLocation(loc)}>
+                            <X className="h-2.5 w-2.5 ml-0.5 hover:text-white" />
+                          </button>
+                        </span>
+                      ))}
+                    </motion.div>
+                  )}
+                </div>
+              )}
 
               {/* ── STEP 6: Skills ────────────────────────────────── */}
-              {step === 6 && (() => {
-                const visibleCount = selectedSkills.length === 0 ? 8 : Math.min(8 + selectedSkills.length * 3, SKILLS.length);
-                const remaining = SKILLS.slice(visibleCount);
-                return (
-                  <div className="space-y-6">
-                    <div className="text-center space-y-2">
-                      <h2 className="text-2xl font-extrabold tracking-tight">Your tech stack?</h2>
-                      <p className="text-[#a0aec0] text-sm">
-                        Select your primary skills (min 2). Powers your AI interview prep.
-                      </p>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2 justify-center">
-                      {SKILLS.slice(0, visibleCount).map((skill) => (
-                        <PillToggle
-                          key={skill}
-                          label={skill}
-                          selected={selectedSkills.includes(skill)}
-                          onClick={() => toggleSkill(skill)}
-                        />
-                      ))}
-                    </div>
-
-                    <div className="text-center">
-                      <span className="text-[11px] text-[#a0aec0]">
-                        {selectedSkills.length} skill{selectedSkills.length !== 1 ? "s" : ""} selected
-                        {selectedSkills.length < 2 && " · select at least 2"}
-                      </span>
-                    </div>
-
-                    {selectedSkills.length > 0 && remaining.length > 0 && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        transition={{ duration: 0.4, ease: "easeOut" }}
-                        className="overflow-hidden"
-                      >
-                        <div className="border-t border-white/[0.06] pt-5 space-y-3">
-                          <p className="text-[10px] text-[#a0aec0] uppercase tracking-wider font-mono text-center">
-                            More skills
-                          </p>
-                          <div className="flex flex-wrap gap-2 justify-center">
-                            {remaining.map((skill) => (
-                              <PillToggle
-                                key={skill}
-                                label={skill}
-                                selected={selectedSkills.includes(skill)}
-                                onClick={() => toggleSkill(skill)}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
+              {step === 6 && (
+                <div className="space-y-6">
+                  <div className="text-center space-y-2">
+                    <h2 className="text-2xl font-extrabold tracking-tight">Your tech stack?</h2>
+                    <p className="text-[#a0aec0] text-sm">
+                      Select your primary skills (min 2). Powers your AI interview prep.
+                    </p>
                   </div>
-                );
-              })()}
+
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {SKILLS.slice(0, selectedSkills.length === 0 ? 8 : Math.min(8 + selectedSkills.length * 3, SKILLS.length)).map((skill) => (
+                      <PillToggle
+                        key={skill}
+                        label={skill}
+                        selected={selectedSkills.includes(skill)}
+                        onClick={() => toggleSkill(skill)}
+                      />
+                    ))}
+                  </div>
+
+                  <div className="text-center">
+                    <span className="text-[11px] text-[#a0aec0]">
+                      {selectedSkills.length} skill{selectedSkills.length !== 1 ? "s" : ""} selected
+                      {selectedSkills.length < 2 && " · select at least 2"}
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {/* ── STEP 7: Launch! ───────────────────────────────── */}
               {step === 7 && (
