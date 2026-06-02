@@ -49,12 +49,11 @@ export default function CareerInsightsPage() {
 
   const latestAnalysis = currentAnalysis;
   const userSkills = useMemo(() => {
-    if (latestAnalysis?.parsed_skills?.length) return latestAnalysis.parsed_skills;
-    return ["Python", "JavaScript", "React", "TypeScript", "SQL"];
+    return latestAnalysis?.parsed_skills || [];
   }, [latestAnalysis]);
 
-  const userExperience = latestAnalysis?.parsed_experience?.map(e => `${e.title} at ${e.company} (${e.duration})`).join(". ") || "5 years of software engineering";
-  const userEducation = latestAnalysis?.parsed_education?.map(e => `${e.degree} at ${e.institution}`).join(". ") || "Bachelor's in Computer Science";
+  const userExperience = latestAnalysis?.parsed_experience?.map(e => `${e.title} at ${e.company} (${e.duration})`).join(". ") || "";
+  const userEducation = latestAnalysis?.parsed_education?.map(e => `${e.degree} at ${e.institution}`).join(". ") || "";
   const userId = typeof window !== "undefined" ? localStorage.getItem("cc_user_id") || "default-user" : "default-user";
 
   const { isLoading: insightLoading } = useCareerInsight(userSkills, userExperience, userEducation);
@@ -66,22 +65,18 @@ export default function CareerInsightsPage() {
   const [dragOver, setDragOver] = useState(false);
 
   const analysisToInsight = useCallback((a: ResumeAnalysis): CareerInsight => ({
-    id: crypto.randomUUID?.() || `ci_${Date.now()}`,
+    id: `ci_${a.id || Date.now()}`,
     strengths: a.strengths || [],
     weaknesses: a.weaknesses || [],
     missing_skills: a.missing_skills || [],
-    recommendations: a.optimization_tips?.slice(0, 8) || [
-      "Take a System Design course to prepare for senior-level interviews",
-      "Build a portfolio of open-source contributions to demonstrate expertise",
-      "Network with industry professionals and attend tech conferences",
-    ],
+    recommendations: a.optimization_tips?.slice(0, 8) || [],
     career_paths: (a.recommended_roles || []).map(r => ({
       role: r.title,
       match: r.match_percentage,
       growth: r.reason || "Advance to senior roles",
     })),
-    ai_summary: a.career_suggestions || "Career analysis complete.",
-    confidence_score: (a.ats_score || 70) / 100,
+    ai_summary: a.career_suggestions || "",
+    confidence_score: a.ats_score ? a.ats_score / 100 : 0,
   }), []);
 
   const handleUpload = useCallback(async (file: File) => {

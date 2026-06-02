@@ -33,9 +33,12 @@ class AutomationQueueManager:
         return ids
 
     async def dequeue(self) -> Optional[Dict[str, Any]]:
-        item = await AutomationQueueItem.find_one(
+        item = await AutomationQueueItem.find(
             AutomationQueueItem.status == AutomationQueueStatus.QUEUED,
-        ).sort(+AutomationQueueItem.priority, +AutomationQueueItem.created_at)
+        ).sort(
+            +AutomationQueueItem.priority,
+            +AutomationQueueItem.created_at,
+        ).limit(1).first_or_none()
 
         if item:
             item.status = AutomationQueueStatus.PROCESSING

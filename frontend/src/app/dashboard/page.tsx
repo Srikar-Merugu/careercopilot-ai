@@ -50,6 +50,8 @@ export default function DashboardPage() {
   useApplications();
   useActivityLog(8);
 
+  const { applications } = useDashboardStore();
+
   const applicationsByStatus = useMemo(() => {
     if (!analytics?.applications_by_status) return {};
     return analytics.applications_by_status;
@@ -58,6 +60,10 @@ export default function DashboardPage() {
   const statusTotal = useMemo(() => {
     return Object.values(applicationsByStatus).reduce((a, b) => a + b, 0);
   }, [applicationsByStatus]);
+
+  const upcomingInterviews = useMemo(() => {
+    return (applications || []).filter((app) => app.status === "interview");
+  }, [applications]);
 
   return (
     <div className="space-y-6 pb-12">
@@ -207,13 +213,22 @@ export default function DashboardPage() {
               </div>
             </div>
             <p className="text-xs text-[#c8d0dc] leading-relaxed">
-              Your profile is strongly aligned with Senior Full Stack and Staff Engineer roles.
-              Top skill to develop this week: <span className="text-primary font-medium">System Design</span>.
-              You have <span className="text-primary font-medium">3 interviews</span> scheduled.
+              {analytics ? (
+                <>Your profile readiness score is <span className="text-primary font-medium">{analytics.interview_readiness}%</span>. 
+                ATS score: <span className="text-primary font-medium">{analytics.ats_score}%</span>. 
+                You have <span className="text-primary font-medium">{analytics.interviews_scheduled} interview{analytics.interviews_scheduled !== 1 ? 's' : ''}</span> scheduled.
+                {analytics.saved_jobs_count > 0 && <> {analytics.saved_jobs_count} saved job{analytics.saved_jobs_count !== 1 ? 's' : ''} in your pipeline.</>}</>
+              ) : (
+                <>Upload your resume to get personalized AI career insights.</>
+              )}
             </p>
             <div className="flex flex-wrap gap-1.5 mt-3">
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">92% Match</span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">5 Skills to Grow</span>
+              {analytics && (
+                <>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">{analytics.interview_readiness}% Readiness</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">{analytics.ats_score}% ATS</span>
+                </>
+              )}
               <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/10 text-primary border border-primary/20">Pro Plan</span>
             </div>
           </motion.div>
@@ -269,22 +284,21 @@ export default function DashboardPage() {
               <Calendar className="h-4 w-4 text-primary" />
               Upcoming Interviews
             </h3>
-            {analytics && analytics.interviews_scheduled > 0 ? (
+            {upcomingInterviews.length > 0 ? (
               <div className="space-y-2">
-                {[
-                  { company: "Stripe", role: "Staff Backend Engineer", date: "Jun 5, 2:00 PM", type: "Technical" },
-                  { company: "OpenAI", role: "AI Research Engineer", date: "Jun 10, 11:00 AM", type: "System Design" },
-                ].map((interview, i) => (
-                  <div key={i} className="p-3 rounded-lg bg-white/5 border border-white/5 hover:border-primary/20 transition-all">
+                {upcomingInterviews.map((interview) => (
+                  <div key={interview.id} className="p-3 rounded-lg bg-white/5 border border-white/5 hover:border-primary/20 transition-all">
                     <div className="flex items-center justify-between mb-1">
                       <p className="text-sm font-semibold text-white">{interview.company}</p>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">{interview.type}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">{interview.status}</span>
                     </div>
-                    <p className="text-xs text-[#a0aec0]">{interview.role}</p>
-                    <div className="flex items-center gap-1.5 mt-1.5">
-                      <Clock className="h-3 w-3 text-amber-400" />
-                      <span className="text-[10px] text-amber-400">{interview.date}</span>
-                    </div>
+                    <p className="text-xs text-[#a0aec0]">{interview.job_title}</p>
+                    {interview.interview_date && (
+                      <div className="flex items-center gap-1.5 mt-1.5">
+                        <Clock className="h-3 w-3 text-amber-400" />
+                        <span className="text-[10px] text-amber-400">{new Date(interview.interview_date).toLocaleDateString()}</span>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

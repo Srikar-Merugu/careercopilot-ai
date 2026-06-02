@@ -12,7 +12,8 @@ from backend.app.schemas.automation import (
 )
 from backend.app.models.automation import (
     AutoApplication, CoverLetter, AutomationQueueItem,
-    AutomationPipeline, AutomationSettings, ApplicationStatus, AutomationQueueStatus,
+    AutomationPipeline, AutomationSettings, AutomationSession,
+    ApplicationStatus, AutomationQueueStatus,
 )
 from backend.app.automation.workers.apply_worker import apply_worker
 from backend.app.automation.ai_generation.cover_letter import cover_letter_generator
@@ -308,28 +309,48 @@ async def _run_pipeline(pipeline: AutomationPipeline, settings: AutomationSettin
         pipeline.current_phase = "searching_jobs"
         await pipeline.save()
 
-        from backend.app.services.job_providers.mock_provider import mock_provider
+        import asyncio
         from backend.app.services.job_providers.base import SearchFilters
 
         filters = SearchFilters(
             query=" ".join(settings.preferred_roles) if settings.preferred_roles else "software engineer",
             page=1, per_page=50,
         )
-        search_result = mock_provider.search(filters)
-        all_jobs = search_result.jobs
+
+        all_jobs = []
+        try:
+            from backend.app.services.job_providers.adzuna_provider import adzuna_provider
+            if adzuna_provider.enabled:
+                search_result = await asyncio.to_thread(adzuna_provider.search, filters)
+                if search_result and search_result.jobs:
+                    all_jobs = search_result.jobs
+        except Exception as e:
+            logger.warning(f"Adzuna search failed: {e}")
+
+        if not all_jobs:
+            from backend.app.services.job_providers.mock_provider import mock_provider
+            search_result = mock_provider.search(filters)
+            all_jobs = search_result.jobs
 
         pipeline.jobs_scanned = len(all_jobs)
         pipeline.current_phase = "matching_jobs"
         await pipeline.save()
 
         user_skills = []
+        resume_text = ""
         try:
-            from backend.app.models.resume import Resume
-            resume = await Resume.find_one(Resume.user_id == user_id)
-            if resume and resume.analysis_results:
-                user_skills = resume.analysis_results.get("parsed_skills", []) or []
-        except Exception:
-            pass
+            from backend.app.models.resume import Resume, ResumeAnalysis
+            resume = await Resume.find(Resume.user_id == user_id).sort(-Resume.created_at).limit(1).first_or_none()
+            if resume:
+                resume_text = resume.parsed_text or ""
+                analysis = await ResumeAnalysis.find_one(ResumeAnalysis.resume_id == resume.id)
+                if analysis and analysis.parsed_skills:
+                    user_skills = analysis.parsed_skills
+                elif resume.parsed_text:
+                    from backend.app.services.ai_analyzer import ai_analyzer
+                    user_skills = ai_analyzer._extract_skills_simple(resume.parsed_text)
+        except Exception as e:
+            logger.warning(f"Could not load resume skills: {e}")
 
         matched_jobs = []
         for job in all_jobs:
@@ -366,12 +387,14 @@ async def _run_pipeline(pipeline: AutomationPipeline, settings: AutomationSettin
                         ai_generated=True,
                     ).insert()
 
+                platform_used = job.source or adzuna_used or "mock"
+
                 await AutoApplication(
                     user_id=user_id,
                     job_id=job.source_id,
                     job_title=job.title,
                     company=job.company,
-                    platform="mock",
+                    platform=platform_used,
                     job_url=job.apply_url or "",
                     status=ApplicationStatus.PENDING,
                     match_score=match_pct,
@@ -383,7 +406,7 @@ async def _run_pipeline(pipeline: AutomationPipeline, settings: AutomationSettin
                     job_id=job.source_id,
                     job_title=job.title,
                     company=job.company,
-                    platform="mock",
+                    platform=platform_used,
                     job_url=job.apply_url or "",
                 ).insert()
                 queue_count += 1
@@ -469,15 +492,36 @@ async def get_quick_stats(current_user: dict = Depends(get_current_user)):
 
 
 @router.get("/platforms/status", response_model=dict)
-async def platform_status():
-    return {
-        "linkedin": {"connected": False, "status": "auth_required"},
-        "naukri": {"connected": False, "status": "auth_required"},
-        "wellfound": {"connected": False, "status": "auth_required"},
-        "internshala": {"connected": False, "status": "auth_required"},
-        "indeed": {"connected": False, "status": "auth_required"},
-        "foundit": {"connected": False, "status": "auth_required"},
-        "browser_connected": browser_manager._browser is not None,
-        "worker_running": getattr(apply_worker, '_running', False),
-        "pipeline_active": False,
-    }
+async def platform_status(current_user: dict = Depends(get_current_user)):
+    user_id = current_user.get("id")
+
+    pipeline = await AutomationPipeline.find(
+        AutomationPipeline.user_id == user_id,
+    ).sort(-AutomationPipeline.created_at).limit(1).first_or_none()
+
+    pipeline_active = pipeline is not None and pipeline.status == "running"
+
+    platform_connections = {}
+    for platform in ["linkedin", "naukri", "wellfound", "internshala", "indeed", "foundit"]:
+        session = await AutomationSession.find_one(
+            AutomationSession.user_id == user_id,
+            AutomationSession.platform == platform,
+            AutomationSession.is_active == True,
+        )
+        if session:
+            platform_connections[platform] = {
+                "connected": True,
+                "status": "connected",
+                "last_used": session.last_used.isoformat() if session.last_used else None,
+            }
+        else:
+            platform_connections[platform] = {
+                "connected": False,
+                "status": "auth_required",
+            }
+
+    platform_connections["browser_connected"] = browser_manager._browser is not None
+    platform_connections["worker_running"] = getattr(apply_worker, '_running', False)
+    platform_connections["pipeline_active"] = pipeline_active
+
+    return platform_connections

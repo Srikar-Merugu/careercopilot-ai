@@ -1,5 +1,4 @@
 import logging
-import random
 from typing import List, Optional, Dict, Any
 from uuid import uuid4
 from datetime import datetime, timedelta
@@ -101,9 +100,21 @@ class RecommendationsService:
         return result
 
     def get_trending_skills(self) -> List[Dict[str, Any]]:
+        skill_trends = {
+            "Generative AI": (97, "+58%"), "LangChain": (94, "+52%"), "Vector Databases": (89, "+45%"),
+            "RAG Systems": (92, "+48%"), "AI Agents": (95, "+55%"), "TypeScript": (91, "+32%"),
+            "React Server Components": (85, "+38%"), "Next.js 15": (88, "+35%"), "Python 3.14": (87, "+28%"),
+            "FastAPI": (84, "+30%"), "Kubernetes": (86, "+25%"), "AWS Lambda": (82, "+22%"),
+            "Terraform": (80, "+24%"), "CI/CD Pipelines": (79, "+20%"), "GitHub Actions": (78, "+22%"),
+            "System Design": (83, "+26%"), "Microservices": (77, "+18%"), "GraphQL": (76, "+20%"),
+            "Machine Learning": (85, "+30%"), "Deep Learning": (82, "+28%"), "NLP": (81, "+32%"),
+            "LLM Fine-tuning": (90, "+50%"), "Cloud Architecture": (84, "+24%"), "DevSecOps": (79, "+26%"),
+        }
+        selected = [s for s in TRENDING_SKILLS if s in skill_trends][:10]
         return [
-            {"skill": skill, "trending_score": round(random.uniform(75, 99), 1), "growth": f"+{random.randint(15, 60)}%"}
-            for skill in random.sample(TRENDING_SKILLS, 10)
+            {"skill": skill, "trending_score": score, "growth": growth}
+            for skill in selected
+            for score, growth in [skill_trends.get(skill, (80, "+20%"))]
         ]
 
     def _get_or_create_session(
@@ -129,30 +140,35 @@ class RecommendationsService:
         return session
 
     def _recommend_jobs(self, session: Dict[str, Any], saved_jobs: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
-        skills = session.get("skills", [])
+        skills = [s.lower() for s in session.get("skills", [])]
         if not skills:
             return [
                 {"title": "Explore Software Engineering Roles", "content": "Start by adding your skills to get personalized job recommendations", "relevance_score": 0.7}
             ]
 
-        search_history = session.get("search_history", [])
-        target_text = " ".join(skills) + " " + " ".join(search_history)
-
-        recommended_titles = [
-            "Senior Software Engineer", "Full Stack Developer", "Frontend Engineer",
-            "Backend Engineer", "DevOps Engineer", "ML Engineer", "Data Scientist",
-            "Cloud Architect", "Technical Lead", "Engineering Manager",
-        ]
+        role_skill_map = {
+            "Full Stack Developer": ["react", "node.js", "typescript", "python", "javascript", "postgresql", "html", "css"],
+            "Frontend Engineer": ["react", "typescript", "javascript", "vue", "angular", "html", "css", "next.js"],
+            "Backend Engineer": ["python", "node.js", "java", "go", "postgresql", "mongodb", "redis", "fastapi"],
+            "DevOps Engineer": ["docker", "kubernetes", "aws", "terraform", "ci/cd", "linux", "python"],
+            "ML Engineer": ["python", "machine learning", "tensorflow", "pytorch", "nlp", "sql", "docker"],
+            "Cloud Architect": ["aws", "gcp", "azure", "docker", "kubernetes", "terraform", "system design"],
+            "Data Scientist": ["python", "sql", "machine learning", "statistics", "visualization", "pandas"],
+            "Engineering Manager": ["leadership", "project management", "system design", "agile"],
+        }
 
         recommendations = []
-        for title in recommended_titles:
-            recommendations.append({
-                "title": title,
-                "content": f"AI-matched {title} role based on your skill profile",
-                "source": "AI Semantic Match",
-                "relevance_score": round(random.uniform(0.6, 0.95), 2),
-                "metadata": {"role": title, "match_type": "semantic"}
-            })
+        for title, req_skills in role_skill_map.items():
+            matched = sum(1 for s in req_skills if s in skills)
+            score = round(matched / len(req_skills), 2) if req_skills else 0.5
+            if score > 0:
+                recommendations.append({
+                    "title": title,
+                    "content": f"AI-matched {title} role — {matched}/{len(req_skills)} skill overlap",
+                    "source": "AI Semantic Match",
+                    "relevance_score": score,
+                    "metadata": {"role": title, "match_type": "semantic", "matched_skills": matched, "total_skills": len(req_skills)}
+                })
 
         recommendations.sort(key=lambda x: x["relevance_score"], reverse=True)
         return recommendations[:6]
@@ -176,30 +192,65 @@ class RecommendationsService:
         return recommendations[:5]
 
     def _recommend_companies(self, session: Dict[str, Any]) -> List[Dict[str, Any]]:
-        companies = random.sample(TRENDING_COMPANIES, 6)
+        skills = [s.lower() for s in session.get("skills", [])]
+        company_relevance = {
+            "Vercel": ["react", "next.js", "javascript", "typescript"],
+            "Supabase": ["postgresql", "react", "typescript", "node.js"],
+            "Stripe": ["python", "java", "go", "rust", "node.js"],
+            "GitHub": ["git", "ci/cd", "actions", "python", "javascript"],
+            "Netflix": ["java", "spring", "aws", "microservices", "system design"],
+            "Datadog": ["python", "go", "docker", "kubernetes", "monitoring"],
+            "OpenAI": ["python", "machine learning", "deep learning", "go"],
+            "Microsoft AI": ["python", "c#", "azure", "machine learning", "typescript"],
+            "Shopify": ["ruby", "react", "typescript", "go", "graphql"],
+            "Plaid": ["python", "go", "typescript", "node.js", "postgresql"],
+        }
+        scored = []
+        for company, req_skills in company_relevance.items():
+            matched = sum(1 for s in req_skills if s in skills)
+            score = round(0.5 + (matched / len(req_skills)) * 0.4 if req_skills else 0.5, 2)
+            if score > 0.5:
+                scored.append((company, score))
+        scored.sort(key=lambda x: x[1], reverse=True)
+        selected = scored[:6] if scored else [(c, 0.6) for c in TRENDING_COMPANIES[:6]]
         return [
             {
                 "title": f"Follow {company}",
-                "content": f"Top tech company actively hiring. Consider preparing applications.",
+                "content": f"Top tech company actively hiring. Your skills align well with their tech stack.",
                 "source": "Company Insights",
-                "relevance_score": round(random.uniform(0.65, 0.92), 2),
+                "relevance_score": score,
                 "metadata": {"company": company}
             }
-            for company in companies
+            for company, score in selected
         ]
 
     def _recommend_courses(self, session: Dict[str, Any], skills: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         current_skills = set(s.lower() for s in (skills or session.get("skills", [])))
 
+        course_skill_map = {
+            "Generative AI with LLMs": "machine learning",
+            "LangChain for LLM Application Development": "python",
+            "System Design Interview": "system design",
+            "AWS Solutions Architect": "aws",
+            "React & Next.js Mastery": "react",
+            "Kubernetes Administrator (CKA)": "kubernetes",
+            "Machine Learning Specialization": "machine learning",
+            "Full Stack TypeScript": "typescript",
+            "Data Engineering with Python": "python",
+            "DevOps & Cloud Engineering": "docker",
+        }
+
         recommendations = []
         for course in COURSE_RECOMMENDATIONS:
-            skill_in_course = course["title"].lower()
-            if not any(s in skill_in_course for s in current_skills):
+            required_skill = course_skill_map.get(course["title"], "").lower()
+            has_skill = any(s in current_skills for s in [required_skill]) if required_skill else False
+            score = 0.5 if not has_skill else 0.8
+            if not has_skill:
                 recommendations.append({
                     "title": course["title"],
                     "content": f"Recommended course by {course['provider']}. Duration: {course['duration']}.",
                     "source": course["provider"],
-                    "relevance_score": round(random.uniform(0.6, 0.9), 2),
+                    "relevance_score": score,
                     "metadata": {"course": course["title"], "provider": course["provider"], "duration": course["duration"]}
                 })
 

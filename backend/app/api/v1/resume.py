@@ -120,7 +120,7 @@ async def analyze_resume(
                 resume.parsed_text = parsed_text
 
         if not parsed_text:
-            parsed_text = "Sample resume text for analysis. Skills: JavaScript, React, Node.js, Python. Experience: 5 years software engineering."
+            parsed_text = ""
 
         analysis_result = ai_analyzer.analyze(parsed_text)
 
