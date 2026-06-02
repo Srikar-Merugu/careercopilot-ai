@@ -15,7 +15,7 @@ from backend.app.services.ai_analyzer import ai_analyzer
 from backend.app.services.storage import storage_service
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/resume", tags=["resume-analysis"])
+router = APIRouter(tags=["resume-analysis"])
 
 ALLOWED_CONTENT_TYPES = {
     "application/pdf": ".pdf",

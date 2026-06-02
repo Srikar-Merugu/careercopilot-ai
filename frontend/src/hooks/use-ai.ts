@@ -5,13 +5,10 @@ import { aiService } from "@/services/ai-service";
 import { useAIStore } from "@/store/ai-store";
 
 export function useCareerInsight(skills: string[], experience: string = "", education: string = "") {
-  const { setCareerInsight } = useAIStore();
-
   return useQuery({
     queryKey: ["ai", "career-insight", skills, experience, education],
     queryFn: async () => {
       const data = await aiService.analyzeCareer(skills, experience, education);
-      setCareerInsight(data);
       return data;
     },
     enabled: skills.length > 0,

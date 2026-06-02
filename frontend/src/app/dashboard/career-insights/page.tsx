@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Brain,
@@ -79,6 +79,28 @@ export default function CareerInsightsPage() {
     confidence_score: a.ats_score ? a.ats_score / 100 : 0,
   }), []);
 
+  const derivedInsight = useMemo(() => {
+    if (careerInsight) return careerInsight;
+    if (currentAnalysis) return analysisToInsight(currentAnalysis);
+    return null;
+  }, [careerInsight, currentAnalysis, analysisToInsight]);
+
+  useEffect(() => {
+    if (!currentAnalysis) {
+      resumeService.list().then(list => {
+        const analyzed = list.find(r => r.status === "analyzed") || list[0];
+        if (analyzed) {
+          resumeService.getAnalysis(analyzed.id).then(result => {
+            if (result.success && result.data) {
+              useResumeStore.getState().setCurrentAnalysis(result.data);
+              useAIStore.getState().setCareerInsight(analysisToInsight(result.data));
+            }
+          }).catch(() => {});
+        }
+      }).catch(() => {});
+    }
+  }, []);
+
   const handleUpload = useCallback(async (file: File) => {
     const validTypes = [
       "application/pdf",
@@ -136,7 +158,7 @@ export default function CareerInsightsPage() {
           <div className="px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/20 flex items-center gap-2">
             <Zap className="h-3.5 w-3.5 text-primary" />
             <span className="text-[11px] font-medium text-primary">
-              {careerInsight ? `${Math.round(careerInsight.confidence_score * 100)}% AI Confidence` : "AI Engine Ready"}
+              {derivedInsight ? `${Math.round(derivedInsight.confidence_score * 100)}% AI Confidence` : "AI Engine Ready"}
             </span>
           </div>
         </div>
@@ -217,7 +239,7 @@ export default function CareerInsightsPage() {
                   </p>
                 </div>
               </div>
-            ) : careerInsight ? (
+            ) : derivedInsight ? (
               <>
                 {/* AI Summary */}
                 <motion.div
@@ -231,7 +253,7 @@ export default function CareerInsightsPage() {
                     </div>
                     <div>
                       <h3 className="text-white font-semibold mb-1">AI Career Analysis</h3>
-                      <p className="text-sm text-[#a0aec0] leading-relaxed">{careerInsight.ai_summary}</p>
+                      <p className="text-sm text-[#a0aec0] leading-relaxed">{derivedInsight.ai_summary}</p>
                     </div>
                   </div>
                 </motion.div>
@@ -251,7 +273,7 @@ export default function CareerInsightsPage() {
                         Key Strengths
                       </h3>
                       <div className="grid sm:grid-cols-2 gap-2">
-                        {careerInsight.strengths.map((s, i) => (
+                        {derivedInsight.strengths.map((s, i) => (
                           <motion.div
                             key={i}
                             initial={{ opacity: 0, x: -10 }}
@@ -277,7 +299,7 @@ export default function CareerInsightsPage() {
                         Development Areas
                       </h3>
                       <div className="grid sm:grid-cols-2 gap-2">
-                        {careerInsight.weaknesses.map((w, i) => (
+                        {derivedInsight.weaknesses.map((w, i) => (
                           <motion.div
                             key={i}
                             initial={{ opacity: 0, x: -10 }}
@@ -303,7 +325,7 @@ export default function CareerInsightsPage() {
                         AI Recommendations
                       </h3>
                       <div className="space-y-2">
-                        {careerInsight.recommendations.map((rec, i) => (
+                        {derivedInsight.recommendations.map((rec, i) => (
                           <motion.div
                             key={i}
                             initial={{ opacity: 0, y: 5 }}
@@ -330,7 +352,7 @@ export default function CareerInsightsPage() {
                       <h3 className="text-white font-semibold mb-4 text-sm">Semantic Profile</h3>
                       <div className="h-64">
                         <CareerRadarChart
-                          matchScore={careerInsight.confidence_score * 100}
+                          matchScore={derivedInsight.confidence_score * 100}
                         />
                       </div>
                     </motion.div>
@@ -346,7 +368,7 @@ export default function CareerInsightsPage() {
                         <Briefcase className="h-4 w-4 text-primary" />
                         Career Paths
                       </h3>
-                      <CareerPathCard paths={careerInsight.career_paths} />
+                      <CareerPathCard paths={derivedInsight.career_paths} />
                     </motion.div>
 
                     {/* Missing Skills */}
@@ -361,7 +383,7 @@ export default function CareerInsightsPage() {
                         Missing Market Skills
                       </h3>
                       <div className="flex flex-wrap gap-1.5">
-                        {careerInsight.missing_skills.map((skill, i) => (
+                        {derivedInsight.missing_skills.map((skill, i) => (
                           <span
                             key={i}
                             className="px-2.5 py-1 rounded-lg text-xs font-medium bg-rose-500/10 text-rose-400 border border-rose-500/20"
@@ -472,7 +494,7 @@ export default function CareerInsightsPage() {
                 <TrendingSkills skills={trendingSkills} isLoading={trendingLoading} />
               </div>
 
-              {careerInsight && (
+              {derivedInsight && (
                 <div className="glass-panel rounded-xl p-5 border border-white/10 bg-[#0a0f2e]/60 backdrop-blur-xl">
                   <h3 className="text-white font-semibold text-sm mb-3 flex items-center gap-2">
                     <Layers className="h-4 w-4 text-primary" />
@@ -480,9 +502,9 @@ export default function CareerInsightsPage() {
                   </h3>
                   <div className="space-y-2">
                     {[
-                      { label: "Strengths", count: careerInsight.strengths.length, color: "bg-emerald-400" },
-                      { label: "Weak areas", count: careerInsight.weaknesses.length, color: "bg-amber-400" },
-                      { label: "Missing skills", count: careerInsight.missing_skills.length, color: "bg-rose-400" },
+                      { label: "Strengths", count: derivedInsight.strengths.length, color: "bg-emerald-400" },
+                      { label: "Weak areas", count: derivedInsight.weaknesses.length, color: "bg-amber-400" },
+                      { label: "Missing skills", count: derivedInsight.missing_skills.length, color: "bg-rose-400" },
                     ].map((item) => (
                       <div key={item.label} className="flex items-center justify-between text-sm">
                         <span className="text-[#a0aec0]">{item.label}</span>
@@ -492,9 +514,9 @@ export default function CareerInsightsPage() {
                               className={`h-full rounded-full ${item.color} transition-all`}
                               style={{
                                 width: `${(item.count / Math.max(
-                                  careerInsight.strengths.length,
-                                  careerInsight.weaknesses.length,
-                                  careerInsight.missing_skills.length,
+                                  derivedInsight.strengths.length,
+                                  derivedInsight.weaknesses.length,
+                                  derivedInsight.missing_skills.length,
                                   1
                                 )) * 100}%`,
                               }}
