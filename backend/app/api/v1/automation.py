@@ -9,6 +9,7 @@ from backend.app.schemas.automation import (
     CoverLetterGenerateRequest, CoverLetterResponse, CoverLetterUpdate,
     AutomationQueueItem as QueueItemSchema, AutomationAnalytics, QueueStatusResponse,
     AutomationSettings as AutomationSettingsSchema, PipelineStartResponse,
+    PlatformAuthRequest, PlatformAuthResponse,
 )
 from backend.app.models.automation import (
     AutoApplication, CoverLetter, AutomationQueueItem,
@@ -18,6 +19,9 @@ from backend.app.models.automation import (
 from backend.app.automation.workers.apply_worker import apply_worker
 from backend.app.automation.ai_generation.cover_letter import cover_letter_generator
 from backend.app.automation.utils.browser import browser_manager
+from backend.app.automation.engine import automation_engine
+from backend.app.automation.notifications import automation_notifier
+from backend.app.services.semantic_matching_service import semantic_matching_service
 from backend.app.services.job_providers.mock_provider import INDIAN_ROLE_TEMPLATES
 from backend.app.core.security import get_current_user
 
@@ -272,6 +276,7 @@ async def update_automation_settings(
 @router.post("/pipeline/start", response_model=PipelineStartResponse)
 async def start_automation_pipeline(current_user: dict = Depends(get_current_user)):
     user_id = current_user.get("id")
+
     existing = await AutomationPipeline.find_one(
         AutomationPipeline.user_id == user_id,
         AutomationPipeline.status == "running",
@@ -287,12 +292,9 @@ async def start_automation_pipeline(current_user: dict = Depends(get_current_use
     if not settings:
         settings = await AutomationSettings(user_id=user_id).insert()
 
-    pipeline = await AutomationPipeline(
-        user_id=user_id,
-        status="running",
-        started_at=datetime.utcnow(),
-        current_phase="scanning_resume",
-    ).insert()
+    pipeline = await automation_engine.start_pipeline(user_id)
+
+    await automation_notifier.pipeline_started(user_id, str(pipeline.id))
 
     import asyncio
     asyncio.create_task(_run_pipeline(pipeline, settings, user_id))
@@ -305,9 +307,9 @@ async def start_automation_pipeline(current_user: dict = Depends(get_current_use
 
 
 async def _run_pipeline(pipeline: AutomationPipeline, settings: AutomationSettings, user_id: str):
+    pipeline_id = str(pipeline.id)
     try:
-        pipeline.current_phase = "searching_jobs"
-        await pipeline.save()
+        await automation_engine.update_phase(pipeline_id, phase="searching_jobs")
 
         import asyncio
         from backend.app.services.job_providers.base import SearchFilters
@@ -318,12 +320,14 @@ async def _run_pipeline(pipeline: AutomationPipeline, settings: AutomationSettin
         )
 
         all_jobs = []
+        adzuna_used = False
         try:
             from backend.app.services.job_providers.adzuna_provider import adzuna_provider
             if adzuna_provider.enabled:
                 search_result = await asyncio.to_thread(adzuna_provider.search, filters)
                 if search_result and search_result.jobs:
                     all_jobs = search_result.jobs
+                    adzuna_used = True
         except Exception as e:
             logger.warning(f"Adzuna search failed: {e}")
 
@@ -332,12 +336,13 @@ async def _run_pipeline(pipeline: AutomationPipeline, settings: AutomationSettin
             search_result = mock_provider.search(filters)
             all_jobs = search_result.jobs
 
-        pipeline.jobs_scanned = len(all_jobs)
-        pipeline.current_phase = "matching_jobs"
-        await pipeline.save()
+        await automation_engine.update_phase(
+            pipeline_id, phase="matching_jobs", jobs_scanned=len(all_jobs),
+        )
 
         user_skills = []
         resume_text = ""
+        resume = None
         try:
             from backend.app.models.resume import Resume, ResumeAnalysis
             resume = await Resume.find(Resume.user_id == user_id).sort(-Resume.created_at).limit(1).first_or_none()
@@ -352,22 +357,71 @@ async def _run_pipeline(pipeline: AutomationPipeline, settings: AutomationSettin
         except Exception as e:
             logger.warning(f"Could not load resume skills: {e}")
 
-        matched_jobs = []
-        for job in all_jobs:
-            if not job.required_skills:
-                continue
-            match_count = sum(1 for s in job.required_skills if any(s.lower() in (us.lower()) for us in user_skills))
-            match_pct = (match_count / len(job.required_skills)) * 100 if job.required_skills else 0
-            if match_pct >= settings.min_match_score:
-                matched_jobs.append((job, match_pct))
+        jobs_dict = [
+            {
+                "id": j.source_id,
+                "title": j.title,
+                "company": j.company,
+                "description": j.description or "",
+                "skills": j.required_skills or [],
+                "location": j.location or "",
+                "salary": f"{j.salary_min}-{j.salary_max}" if j.salary_min else None,
+            }
+            for j in all_jobs if j.required_skills
+        ]
 
-        pipeline.jobs_matched = len(matched_jobs)
-        pipeline.current_phase = "queuing_applications"
-        await pipeline.save()
+        if jobs_dict and resume_text:
+            try:
+                matched_results = semantic_matching_service.batch_match(
+                    resume_text=resume_text,
+                    user_skills=user_skills,
+                    jobs=jobs_dict,
+                    top_k=settings.daily_limit,
+                    resume_title=getattr(resume, "job_title", None) if resume else None,
+                )
+                matched_jobs_list = []
+                for mr in matched_results:
+                    score = mr["match_score"]
+                    if score >= settings.min_match_score:
+                        original = next(
+                            (j for j in all_jobs if j.source_id == mr["job_id"]),
+                            None,
+                        )
+                        if original:
+                            matched_jobs_list.append((original, score))
+            except Exception as e:
+                logger.warning(f"Semantic matching failed, falling back to keyword: {e}")
+                matched_jobs_list = []
+                for job in all_jobs:
+                    if not job.required_skills:
+                        continue
+                    match_count = sum(
+                        1 for s in job.required_skills
+                        if any(s.lower() in (us.lower()) for us in user_skills)
+                    )
+                    match_pct = (match_count / len(job.required_skills)) * 100 if job.required_skills else 0
+                    if match_pct >= settings.min_match_score:
+                        matched_jobs_list.append((job, match_pct))
+        else:
+            matched_jobs_list = []
+            for job in all_jobs:
+                if not job.required_skills:
+                    continue
+                match_count = sum(
+                    1 for s in job.required_skills
+                    if any(s.lower() in (us.lower()) for us in user_skills)
+                )
+                match_pct = (match_count / len(job.required_skills)) * 100 if job.required_skills else 0
+                if match_pct >= settings.min_match_score:
+                    matched_jobs_list.append((job, match_pct))
+
+        await automation_engine.update_phase(
+            pipeline_id, phase="queuing_applications", jobs_matched=len(matched_jobs_list),
+        )
 
         from backend.app.automation.ai_generation.cover_letter import cover_letter_generator
         queue_count = 0
-        for job, match_pct in matched_jobs[:settings.daily_limit]:
+        for job, match_pct in matched_jobs_list[:settings.daily_limit]:
             try:
                 cover_letter_content = ""
                 if settings.auto_generate_cover_letter:
@@ -387,9 +441,9 @@ async def _run_pipeline(pipeline: AutomationPipeline, settings: AutomationSettin
                         ai_generated=True,
                     ).insert()
 
-                platform_used = job.source or adzuna_used or "mock"
+                platform_used = job.source or ("adzuna" if adzuna_used else "mock")
 
-                await AutoApplication(
+                app = await AutoApplication(
                     user_id=user_id,
                     job_id=job.source_id,
                     job_title=job.title,
@@ -410,27 +464,34 @@ async def _run_pipeline(pipeline: AutomationPipeline, settings: AutomationSettin
                     job_url=job.apply_url or "",
                 ).insert()
                 queue_count += 1
+
+                await automation_notifier.application_submitted(
+                    user_id, job.title, job.company or "", str(app.id),
+                )
             except Exception as e:
                 logger.error(f"Failed to queue job {job.source_id}: {e}")
 
             if queue_count >= settings.daily_limit:
                 break
 
-        pipeline.jobs_queued = queue_count
-        pipeline.current_phase = "completed"
-        pipeline.status = "completed"
-        pipeline.completed_at = datetime.utcnow()
-        await pipeline.save()
+        await automation_engine.complete_pipeline(
+            pipeline_id, jobs_queued=queue_count,
+        )
+
+        await automation_notifier.pipeline_completed(
+            user_id, pipeline_id,
+            jobs_scanned=len(all_jobs),
+            jobs_matched=len(matched_jobs_list),
+            jobs_queued=queue_count,
+        )
 
         if apply_worker and hasattr(apply_worker, '_running') and not apply_worker._running:
             await apply_worker.start()
 
     except Exception as e:
         logger.error(f"Pipeline failed: {e}")
-        pipeline.status = "failed"
-        pipeline.error_message = str(e)
-        pipeline.current_phase = "error"
-        await pipeline.save()
+        await automation_engine.fail_pipeline(pipeline_id, str(e))
+        await automation_notifier.pipeline_failed(user_id, pipeline_id, str(e))
 
 
 @router.get("/pipeline/status", response_model=PipelineStartResponse)
@@ -489,6 +550,46 @@ async def get_quick_stats(current_user: dict = Depends(get_current_user)):
         "failed_count": failed_count,
         "queue_count": queue_count,
     }
+
+
+@router.post("/platforms/auth", response_model=PlatformAuthResponse)
+async def platform_auth(
+    payload: PlatformAuthRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = current_user.get("id")
+    platform = payload.platform.lower()
+
+    existing = await AutomationSession.find_one(
+        AutomationSession.user_id == user_id,
+        AutomationSession.platform == platform,
+    )
+
+    if existing:
+        existing.session_data = payload.session_data
+        existing.cookies = payload.cookies
+        existing.is_active = True
+        existing.last_used = datetime.utcnow()
+        await existing.save()
+        session = existing
+    else:
+        session = await AutomationSession(
+            user_id=user_id,
+            platform=platform,
+            session_data=payload.session_data,
+            cookies=payload.cookies,
+            is_active=True,
+        ).insert()
+
+    await automation_notifier.platform_connected(user_id, platform)
+    logger.info(f"Platform auth saved: {platform} for user {user_id}")
+
+    return PlatformAuthResponse(
+        ok=True,
+        message=f"{platform.capitalize()} authentication saved successfully",
+        platform=platform,
+        connected=True,
+    )
 
 
 @router.get("/platforms/status", response_model=dict)

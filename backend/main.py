@@ -13,6 +13,7 @@ from backend.app.middleware.security import setup_security_headers
 from backend.app.middleware.rate_limit import RateLimitMiddleware, FeatureAccessMiddleware
 from backend.app.api.router import api_router
 from backend.app.db.session import init_db, close_db
+from backend.app.automation.engine import automation_engine
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,9 @@ setup_logging()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await init_db()
+    db_ok = await init_db()
+    if db_ok:
+        await automation_engine.initialize()
     yield
     await close_db()
 

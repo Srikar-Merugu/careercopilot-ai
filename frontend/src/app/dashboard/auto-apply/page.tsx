@@ -25,6 +25,7 @@ export default function AutoApplyPage() {
   const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
   const [settings, setSettings] = useState<AutomationSettings | null>(null);
   const [platformStatus, setPlatformStatus] = useState<Record<string, any> | null>(null);
+  const [pipelinePhase, setPipelinePhase] = useState<string>("");
 
   const [selectedCoverLetter, setSelectedCoverLetter] = useState<CoverLetter | null>(null);
   const [editingCoverLetter, setEditingCoverLetter] = useState(false);
@@ -32,7 +33,7 @@ export default function AutoApplyPage() {
 
   const fetchAll = useCallback(async () => {
     try {
-      const [s, a, apps, cls, qs, qi, pl] = await Promise.allSettled([
+      const [s, a, apps, cls, qs, qi, pl, ps] = await Promise.allSettled([
         autoApplyService.getStats(),
         autoApplyService.getAnalytics(),
         autoApplyService.getApplications(),
@@ -40,6 +41,7 @@ export default function AutoApplyPage() {
         autoApplyService.getQueueStatus(),
         autoApplyService.getQueue(),
         autoApplyService.getPlatformStatus(),
+        autoApplyService.getPipelineStatus(),
       ]);
 
       if (s.status === "fulfilled") setStats(s.value);
@@ -48,7 +50,20 @@ export default function AutoApplyPage() {
       if (cls.status === "fulfilled") setCoverLetters(cls.value);
       if (qs.status === "fulfilled") setQueueStatus(qs.value);
       if (qi.status === "fulfilled") setQueueItems(qi.value);
-      if (pl.status === "fulfilled") setPlatformStatus(pl.value);
+      if (pl.status === "fulfilled") {
+        setPlatformStatus(pl.value);
+        if (pl.value.pipeline_active) {
+          setAutomationRunning(true);
+        }
+      }
+      if (ps.status === "fulfilled") {
+        setPipelinePhase(ps.value.message || "");
+        if (ps.value.status === "running") {
+          setAutomationRunning(true);
+        } else if (ps.value.status === "interrupted") {
+          setAutomationRunning(false);
+        }
+      }
     } catch (e) {
       setError("Failed to load automation data");
     } finally {
@@ -57,6 +72,20 @@ export default function AutoApplyPage() {
   }, []);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  useEffect(() => {
+    if (!automationRunning) return;
+    const interval = setInterval(() => {
+      autoApplyService.getPipelineStatus().then((ps) => {
+        setPipelinePhase(ps.message || "");
+        if (ps.status === "completed" || ps.status === "failed" || ps.status === "interrupted") {
+          setAutomationRunning(false);
+          fetchAll();
+        }
+      }).catch(() => {});
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [automationRunning, fetchAll]);
 
   const handleStartPipeline = async () => {
     setPipelineRunning(true);
@@ -151,7 +180,7 @@ export default function AutoApplyPage() {
             {pipelineRunning ? (
               <><Loader2 className="h-4 w-4 animate-spin" /> Starting...</>
             ) : automationRunning ? (
-              <><Activity className="h-4 w-4" /> Running</>
+              <><Activity className="h-4 w-4" /> {pipelinePhase ? pipelinePhase.replace(/_/g, ' ') : "Running"}</>
             ) : (
               <><Play className="h-4 w-4" /> Start Automation</>
             )}
@@ -321,6 +350,24 @@ export default function AutoApplyPage() {
                   )) : (
                     <div className="col-span-2 text-sm text-muted-foreground text-center py-4">Platform status unavailable</div>
                   )}
+                </div>
+                <div className="mt-3 flex gap-3">
+                  <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs ${
+                    platformStatus?.worker_running
+                      ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                      : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                  }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${platformStatus?.worker_running ? "bg-emerald-400" : "bg-amber-400"}`} />
+                    Worker: {platformStatus?.worker_running ? "Online" : "Idle"}
+                  </div>
+                  <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs ${
+                    platformStatus?.browser_connected
+                      ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                      : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                  }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${platformStatus?.browser_connected ? "bg-emerald-400" : "bg-amber-400"}`} />
+                    Browser: {platformStatus?.browser_connected ? "Connected" : "Offline"}
+                  </div>
                 </div>
               </motion.div>
             </div>

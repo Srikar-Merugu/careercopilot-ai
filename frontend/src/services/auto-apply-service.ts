@@ -186,4 +186,9 @@ export const autoApplyService = {
     handleResponse<Record<string, any>>(
       apiClient.get(`${AUTO_API}/platforms/status`)
     ),
+
+  platformAuth: (data: { platform: string; session_data?: Record<string, any>; cookies?: Record<string, any> }) =>
+    handleResponse<{ ok: boolean; message: string; platform: string; connected: boolean }>(
+      apiClient.post(`${AUTO_API}/platforms/auth`, data)
+    ),
 };

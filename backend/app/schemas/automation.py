@@ -143,3 +143,16 @@ class PipelineStartResponse(BaseModel):
     jobs_scanned: Optional[int] = 0
     jobs_matched: Optional[int] = 0
     jobs_queued: Optional[int] = 0
+
+
+class PlatformAuthRequest(BaseModel):
+    platform: str
+    session_data: Dict[str, Any] = {}
+    cookies: Dict[str, Any] = {}
+
+
+class PlatformAuthResponse(BaseModel):
+    ok: bool
+    message: str
+    platform: str
+    connected: bool = True
