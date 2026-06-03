@@ -37,9 +37,11 @@ class ResumeParserService:
 
     @classmethod
     def parse(cls, file_bytes: bytes, file_type: str) -> Optional[str]:
-        if file_type == "application/pdf":
+        ft = file_type.lower()
+        if ft in (".pdf", "application/pdf"):
             return cls.parse_pdf(file_bytes)
-        elif file_type in (
+        elif ft in (
+            ".docx", ".doc",
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             "application/msword",
         ):
