@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, BookOpen, TrendingUp, AlertCircle, CheckCircle2, Clock, Target } from "lucide-react";
 import { useSkillGap, useCareerRoadmap } from "@/hooks/use-ai";
@@ -21,10 +21,9 @@ const POPULAR_ROLES = [
 ];
 
 export function SkillGapAnalyzer() {
-  const { skillGap, careerRoadmap, isLoading } = useAIStore();
+  const { skillGap, careerRoadmap, isLoading, setSkillGap, setCareerRoadmap } = useAIStore();
   const [skillsInput, setSkillsInput] = useState("");
   const [selectedRole, setSelectedRole] = useState("");
-  const [customRole, setCustomRole] = useState("");
   const [showRoadmap, setShowRoadmap] = useState(false);
 
   const skillList = skillsInput
@@ -32,22 +31,27 @@ export function SkillGapAnalyzer() {
     .map((s) => s.trim())
     .filter(Boolean);
 
-  const targetRole = selectedRole || customRole;
+  const { refetch: analyzeGap } = useSkillGap(skillList, selectedRole);
+  const { refetch: getRoadmap } = useCareerRoadmap(skillList, selectedRole);
 
-  const { refetch: analyzeGap } = useSkillGap(skillList, targetRole);
-  const { refetch: getRoadmap } = useCareerRoadmap(skillList, targetRole);
-
-  const handleAnalyze = async () => {
-    if (skillList.length === 0 || !targetRole) return;
+  const handleAnalyze = useCallback(async () => {
+    if (skillList.length === 0 || !selectedRole) return;
     setShowRoadmap(false);
     await analyzeGap();
-  };
+  }, [skillList, selectedRole, analyzeGap]);
 
-  const handleRoadmap = async () => {
-    if (skillList.length === 0 || !targetRole) return;
+  const handleRoadmap = useCallback(async () => {
+    if (skillList.length === 0 || !selectedRole) return;
     setShowRoadmap(true);
     await getRoadmap();
-  };
+  }, [skillList, selectedRole, getRoadmap]);
+
+  const handleRoleClick = useCallback(async (role: string) => {
+    setSelectedRole(role);
+    setSkillGap(null);
+    setCareerRoadmap(null);
+    setShowRoadmap(false);
+  }, [setSkillGap, setCareerRoadmap]);
 
   return (
     <div className="space-y-6">
@@ -71,14 +75,11 @@ export function SkillGapAnalyzer() {
 
           <div>
             <label className="block text-sm text-[#a0aec0] mb-2">Target Role</label>
-            <div className="flex flex-wrap gap-2 mb-3">
+            <div className="flex flex-wrap gap-2">
               {POPULAR_ROLES.map((role) => (
                 <button
                   key={role}
-                  onClick={() => {
-                    setSelectedRole(role);
-                    setCustomRole("");
-                  }}
+                  onClick={() => handleRoleClick(role)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
                     selectedRole === role
                       ? "bg-primary/20 border-primary/40 text-primary"
@@ -89,36 +90,28 @@ export function SkillGapAnalyzer() {
                 </button>
               ))}
             </div>
-            <input
-              type="text"
-              value={customRole}
-              onChange={(e) => {
-                setCustomRole(e.target.value);
-                setSelectedRole("");
-              }}
-              placeholder="Or type a custom role..."
-              className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white text-sm placeholder:text-[#4a5568] focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/30 transition-all"
-            />
           </div>
 
-          <div className="flex gap-3">
-            <button
-              onClick={handleAnalyze}
-              disabled={skillList.length === 0 || !targetRole}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-primary hover:bg-primary/90 text-white font-medium text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <Search className="h-4 w-4" />
-              Analyze Gap
-            </button>
-            <button
-              onClick={handleRoadmap}
-              disabled={skillList.length === 0 || !targetRole}
-              className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-primary/30 hover:bg-primary/10 text-primary font-medium text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <BookOpen className="h-4 w-4" />
-              Roadmap
-            </button>
-          </div>
+          {selectedRole && (
+            <div className="flex gap-3">
+              <button
+                onClick={handleAnalyze}
+                disabled={skillList.length === 0}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-primary hover:bg-primary/90 text-white font-medium text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Search className="h-4 w-4" />
+                Analyze Gap
+              </button>
+              <button
+                onClick={handleRoadmap}
+                disabled={skillList.length === 0}
+                className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-primary/30 hover:bg-primary/10 text-primary font-medium text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <BookOpen className="h-4 w-4" />
+                Roadmap
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -155,7 +148,7 @@ export function SkillGapAnalyzer() {
                 <div>
                   <h4 className="text-white font-semibold text-lg">Role Readiness</h4>
                   <p className="text-sm text-[#a0aec0] mt-1">
-                    Your profile readiness for <span className="text-primary font-medium">{targetRole}</span>
+                    Your profile readiness for <span className="text-primary font-medium">{selectedRole}</span>
                   </p>
                   <div className="flex flex-wrap gap-1.5 mt-2">
                     {skillGap.strengths.map((s, i) => (
@@ -241,7 +234,7 @@ export function SkillGapAnalyzer() {
                     Career Roadmap
                   </h4>
                   <p className="text-sm text-[#a0aec0] mt-1">
-                    {careerRoadmap.timeline_months} month journey to {targetRole}
+                    {careerRoadmap.timeline_months} month journey to {selectedRole}
                   </p>
                 </div>
                 <MatchScoreRing
@@ -321,8 +314,8 @@ export function SkillGapAnalyzer() {
       {!isLoading && !skillGap && !careerRoadmap && (
         <div className="glass-panel rounded-xl p-8 border border-white/10 bg-[#0a0f2e]/60 backdrop-blur-xl text-center">
           <Search className="h-10 w-10 text-[#4a5568] mx-auto mb-3" />
-          <p className="text-[#a0aec0] text-sm">Enter your skills and target role above to analyze skill gaps</p>
-          <p className="text-xs text-[#4a5568] mt-1">AI will compare your profile against market requirements</p>
+          <p className="text-[#a0aec0] text-sm">Select a target role and click Analyze Gap or Roadmap</p>
+          <p className="text-xs text-[#4a5568] mt-1">AI will compare your skills against market requirements for that role</p>
         </div>
       )}
     </div>
