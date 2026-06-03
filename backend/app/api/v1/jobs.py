@@ -241,6 +241,35 @@ async def save_job(
     if existing:
         return {"success": True, "message": "Job already saved", "saved": True}
 
+    existing_job = await Job.find_one(Job.id == job_id)
+    if not existing_job:
+        for provider in get_providers():
+            jd = provider.get_by_id(job_id)
+            if jd:
+                job_doc = Job(
+                    id=job_id,
+                    source=jd.source,
+                    source_id=jd.source_id,
+                    title=jd.title,
+                    company=jd.company,
+                    company_logo=jd.company_logo,
+                    location=jd.location,
+                    salary_min=jd.salary_min,
+                    salary_max=jd.salary_max,
+                    salary_currency=jd.salary_currency or "INR",
+                    description=jd.description,
+                    requirements=jd.requirements,
+                    required_skills=jd.required_skills or [],
+                    experience_required=jd.experience_required,
+                    job_type=jd.job_type,
+                    remote_type=jd.remote_type,
+                    apply_url=jd.apply_url,
+                    category=jd.category,
+                    posted_at=jd.posted_at,
+                )
+                await job_doc.insert()
+                break
+
     saved = SavedJob(user_id=user_id, job_id=job_id)
     await saved.insert()
 
@@ -280,10 +309,21 @@ async def list_saved_jobs(
                     "source": job.source,
                     "title": job.title,
                     "company": job.company,
+                    "company_logo": job.company_logo,
                     "location": job.location,
                     "salary_min": job.salary_min,
                     "salary_max": job.salary_max,
+                    "salary_currency": job.salary_currency,
+                    "description": job.description,
+                    "requirements": job.requirements,
+                    "required_skills": job.required_skills or [],
+                    "experience_required": job.experience_required,
+                    "job_type": job.job_type,
+                    "remote_type": job.remote_type,
                     "apply_url": job.apply_url,
+                    "category": job.category,
+                    "posted_at": job.posted_at.isoformat() if job.posted_at else None,
+                    "created_at": job.created_at.isoformat() if job.created_at else datetime.utcnow().isoformat(),
                 },
                 "saved_at": s.saved_at.isoformat() if s.saved_at else None,
             })
