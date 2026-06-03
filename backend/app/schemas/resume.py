@@ -65,14 +65,9 @@ class ResumeDetailResponse(BaseModel):
     analysis: Optional[ResumeAnalysisResponse] = None
 
 
-class ResumeUploadResponse(BaseModel):
-    id: str
-    file_name: str
-    file_type: str
-    file_size: int
-    file_url: str
-    status: str
-    created_at: datetime
+class ResumeAnalysisResultResponse(BaseModel):
+    success: bool = True
+    data: ResumeAnalysisResponse
 
 
 class ErrorResponse(BaseModel):

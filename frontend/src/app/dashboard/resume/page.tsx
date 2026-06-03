@@ -89,17 +89,15 @@ export default function ResumePage() {
     setUploadStatus("uploading");
 
     try {
-      const uploaded = await resumeService.upload(file, (progress) => {
-        setUploadProgress(progress);
-      });
-
-      setCurrentResumeId(uploaded.id);
       setUploadStatus("analyzing");
       setIsAnalyzing(true);
 
-      const analysisResult = await resumeService.analyze(uploaded.id);
+      const analysisResult = await resumeService.uploadAndAnalyze(file, (progress) => {
+        setUploadProgress(progress);
+      });
 
       setCurrentAnalysis(analysisResult.data);
+      setCurrentResumeId(analysisResult.data.resume_id);
       setUploadStatus("success");
       setIsAnalyzing(false);
       toast(

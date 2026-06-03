@@ -121,8 +121,7 @@ export default function CareerInsightsPage() {
     }
     setUploadingFile(true);
     try {
-      const uploaded = await resumeService.upload(file);
-      const analysisResult = await resumeService.analyze(uploaded.id);
+      const analysisResult = await resumeService.uploadAndAnalyze(file);
       if (analysisResult.success) {
         useResumeStore.getState().setCurrentAnalysis(analysisResult.data);
         useAIStore.getState().setCareerInsight(analysisToInsight(analysisResult.data));

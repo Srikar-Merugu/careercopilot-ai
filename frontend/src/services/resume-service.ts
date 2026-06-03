@@ -39,6 +39,28 @@ export const resumeService = {
     return response.data;
   },
 
+  async uploadAndAnalyze(file: File, onProgress?: (progress: number) => void): Promise<{ success: boolean; data: ResumeAnalysis }> {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await apiClient.post<{ success: boolean; data: ResumeAnalysis }>(
+      "/resume/upload-and-analyze",
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total && onProgress) {
+            const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            onProgress(percent);
+          }
+        },
+        timeout: 180000,
+      }
+    );
+
+    return response.data;
+  },
+
   async list(): Promise<ResumeListItem[]> {
     const response = await apiClient.get<ResumeListItem[]>("/resume/list");
     return response.data;

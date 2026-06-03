@@ -31,7 +31,19 @@ async def upload_resume(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user.get("id")
+    return await _do_upload(file, user_id, auto_analyze=False)
 
+
+@router.post("/upload-and-analyze")
+async def upload_and_analyze(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = current_user.get("id")
+    return await _do_upload(file, user_id, auto_analyze=True)
+
+
+async def _do_upload(file: UploadFile, user_id: str, auto_analyze: bool):
     if file.content_type not in ALLOWED_CONTENT_TYPES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -68,16 +80,68 @@ async def upload_resume(
         status="uploaded",
     )
     await resume.insert()
+    resume_id_str = str(resume.id)
 
-    return ResumeUploadResponse(
-        id=str(resume.id),
-        file_name=resume.file_name,
-        file_type=resume.file_type,
-        file_size=resume.file_size,
-        file_url=resume.file_url,
-        status=resume.status,
-        created_at=resume.created_at,
-    )
+    if not auto_analyze:
+        return ResumeUploadResponse(
+            id=resume_id_str,
+            file_name=resume.file_name,
+            file_type=resume.file_type,
+            file_size=resume.file_size,
+            file_url=resume.file_url,
+            status=resume.status,
+            created_at=resume.created_at,
+        )
+
+    resume.status = "analyzing"
+    await resume.save()
+
+    try:
+        parsed_text = resume_parser.parse(file_bytes, file_ext)
+        if parsed_text:
+            resume.parsed_text = parsed_text
+
+        analysis_result = ai_analyzer.analyze(parsed_text or "")
+
+        analysis_data = {
+            "resume_id": resume_id_str,
+            "parsed_name": resume_parser.extract_name(parsed_text or ""),
+            "parsed_email": resume_parser.extract_email(parsed_text or ""),
+            "parsed_phone": resume_parser.extract_phone(parsed_text or ""),
+            "parsed_skills": analysis_result.skills,
+            "parsed_experience": analysis_result.experience,
+            "parsed_projects": analysis_result.projects,
+            "parsed_education": analysis_result.education,
+            "parsed_certifications": analysis_result.certifications,
+            "parsed_achievements": analysis_result.achievements,
+            "ats_score": analysis_result.ats_score,
+            "ats_breakdown": analysis_result.ats_breakdown,
+            "strengths": analysis_result.strengths,
+            "weaknesses": analysis_result.weaknesses,
+            "missing_skills": analysis_result.missing_skills,
+            "recommended_roles": analysis_result.recommended_roles,
+            "career_suggestions": analysis_result.career_suggestions,
+            "optimization_tips": analysis_result.optimization_tips,
+            "ai_feedback": analysis_result.ai_feedback,
+        }
+
+        analysis = ResumeAnalysis(**analysis_data)
+        await analysis.insert()
+
+        resume.ats_score = analysis_result.ats_score
+        resume.status = "analyzed"
+        await resume.save()
+
+        return {"success": True, "data": _serialize_analysis(analysis)}
+
+    except Exception as e:
+        resume.status = "failed"
+        await resume.save()
+        logger.error(f"Upload-and-analyze failed: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Analysis failed: {str(e)}",
+        )
 
 
 @router.post("/{resume_id}/analyze")
