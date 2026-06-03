@@ -87,7 +87,7 @@ interface JobState {
   setIsLoading: (loading: boolean) => void;
   setSelectedJob: (job: JobWithMatch | null) => void;
   setSavedJobs: (jobs: SavedJobItem[]) => void;
-  addSavedJob: (job: SavedJobItem) => void;
+  addSavedJobId: (jobId: string) => void;
   removeSavedJob: (jobId: string) => void;
   setRecommendations: (recs: JobState["recommendations"]) => void;
 }
@@ -126,10 +126,9 @@ export const useJobStore = create<JobState>((set) => ({
       savedJobIds: new Set(jobs.map((j) => j.job_id)),
     }),
 
-  addSavedJob: (job) =>
+  addSavedJobId: (jobId) =>
     set((state) => ({
-      savedJobs: [job, ...state.savedJobs],
-      savedJobIds: new Set([...state.savedJobIds, job.job_id]),
+      savedJobIds: new Set([...state.savedJobIds, jobId]),
     })),
 
   removeSavedJob: (jobId) =>

@@ -68,7 +68,7 @@ export function useSavedJobs() {
 
 export function useSaveJob() {
   const queryClient = useQueryClient();
-  const { addSavedJob, removeSavedJob, savedJobIds } = useJobStore();
+  const { addSavedJobId, removeSavedJob, savedJobIds } = useJobStore();
   const { toast } = useToast();
 
   const saveMutation = useMutation({
@@ -78,7 +78,7 @@ export function useSaveJob() {
     },
     onMutate: async (jobId) => {
       await queryClient.cancelQueries({ queryKey: ["jobs", "saved"] });
-      addSavedJob({ id: jobId, job_id: jobId, job: {} as any, saved_at: new Date().toISOString() });
+      addSavedJobId(jobId);
       const saved = JSON.parse(localStorage.getItem("cc_saved_jobs") || "[]");
       if (!saved.includes(jobId)) {
         saved.push(jobId);
