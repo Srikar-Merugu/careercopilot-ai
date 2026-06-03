@@ -21,10 +21,9 @@ adzuna_provider = AdzunaJobProvider()
 
 
 def get_providers():
-    providers = [mock_provider]
     if adzuna_provider.enabled:
-        providers.append(adzuna_provider)
-    return providers
+        return [adzuna_provider]
+    return [mock_provider]
 
 
 @router.get("/search", response_model=JobSearchResponse)
