@@ -256,24 +256,11 @@ export const jobService = {
   },
 
   async saveJob(jobId: string): Promise<void> {
-    try {
-      await apiClient.post(`/jobs/save/${jobId}`);
-    } catch (e) {
-      const saved = JSON.parse(localStorage.getItem("cc_saved_jobs") || "[]");
-      if (!saved.includes(jobId)) {
-        saved.push(jobId);
-        localStorage.setItem("cc_saved_jobs", JSON.stringify(saved));
-      }
-    }
+    await apiClient.post(`/jobs/save/${jobId}`);
   },
 
   async unsaveJob(jobId: string): Promise<void> {
-    try {
-      await apiClient.delete(`/jobs/save/${jobId}`);
-    } catch (e) {
-      const saved = JSON.parse(localStorage.getItem("cc_saved_jobs") || "[]");
-      localStorage.setItem("cc_saved_jobs", JSON.stringify(saved.filter((id: string) => id !== jobId)));
-    }
+    await apiClient.delete(`/jobs/save/${jobId}`);
   },
 
   async listSaved(): Promise<SavedListResponse> {

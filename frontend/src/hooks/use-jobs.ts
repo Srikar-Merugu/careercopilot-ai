@@ -68,7 +68,7 @@ export function useSavedJobs() {
 
 export function useSaveJob() {
   const queryClient = useQueryClient();
-  const { removeSavedJob } = useJobStore();
+  const { addSavedJob, removeSavedJob, savedJobIds } = useJobStore();
   const { toast } = useToast();
 
   const saveMutation = useMutation({
@@ -76,12 +76,22 @@ export function useSaveJob() {
       await jobService.saveJob(jobId);
       return jobId;
     },
+    onMutate: async (jobId) => {
+      await queryClient.cancelQueries({ queryKey: ["jobs", "saved"] });
+      addSavedJob({ id: jobId, job_id: jobId, job: {} as any, saved_at: new Date().toISOString() });
+      const saved = JSON.parse(localStorage.getItem("cc_saved_jobs") || "[]");
+      if (!saved.includes(jobId)) {
+        saved.push(jobId);
+        localStorage.setItem("cc_saved_jobs", JSON.stringify(saved));
+      }
+    },
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: ["jobs", "saved"] });
+      toast("Error", "Failed to save job.", "error");
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["jobs", "saved"] });
       toast("Job Saved", "Job has been saved to your bookmarks.", "success");
-    },
-    onError: () => {
-      toast("Error", "Failed to save job.", "error");
     },
   });
 
@@ -90,13 +100,19 @@ export function useSaveJob() {
       await jobService.unsaveJob(jobId);
       return jobId;
     },
-    onSuccess: (jobId) => {
+    onMutate: async (jobId) => {
+      await queryClient.cancelQueries({ queryKey: ["jobs", "saved"] });
       removeSavedJob(jobId);
-      queryClient.invalidateQueries({ queryKey: ["jobs", "saved"] });
-      toast("Job Unsaved", "Job removed from your bookmarks.", "info");
+      const saved = JSON.parse(localStorage.getItem("cc_saved_jobs") || "[]");
+      localStorage.setItem("cc_saved_jobs", JSON.stringify(saved.filter((id: string) => id !== jobId)));
     },
     onError: () => {
+      queryClient.invalidateQueries({ queryKey: ["jobs", "saved"] });
       toast("Error", "Failed to unsave job.", "error");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["jobs", "saved"] });
+      toast("Job Unsaved", "Job removed from your bookmarks.", "info");
     },
   });
 
