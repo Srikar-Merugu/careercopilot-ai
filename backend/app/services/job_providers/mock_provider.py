@@ -58,18 +58,20 @@ INDIAN_REMOTE_CITIES = [
     "Delhi", "Gurgaon", "Noida",
 ]
 
-APPLY_URL_PREFIXES = [
-    "https://www.linkedin.com/jobs/view",
-    "https://www.naukri.com/job",
-    "https://wellfound.com/jobs",
-    "https://internshala.com/internship",
-    "https://instahyre.com/job",
-    "https://cutshort.com/job",
-    "https://hasjob.co/job",
-    "https://www.freshersworld.com/jobs",
-    "https://www.timesjobs.com/job",
-    "https://www.monsterindia.com/job",
-]
+def _build_apply_url(title: str, company: str) -> str:
+    templates = [
+        f"https://www.linkedin.com/jobs/search/?keywords={title.replace(' ', '+')}&location=India",
+        f"https://www.naukri.com/{title.lower().replace(' ', '-')}-jobs-in-india",
+        f"https://wellfound.com/company/{company.lower().replace(' ', '-').replace('.', '')}/jobs",
+        f"https://internshala.com/internships/{title.lower().replace(' ', '-')}-internship",
+        f"https://www.instahyre.com/jobs/{title.lower().replace(' ', '-')}/",
+        f"https://cutshort.io/jobs?q={title.replace(' ', '+')}",
+        f"https://hasjob.co/search?q={title.replace(' ', '+')}",
+        f"https://www.freshersworld.com/jobs/{title.lower().replace(' ', '-')}",
+        f"https://www.timesjobs.com/candidate/job-search.html?searchText={title.replace(' ', '+')}",
+        f"https://www.monsterindia.com/search/{title.lower().replace(' ', '-')}-jobs",
+    ]
+    return random.choice(templates)
 
 JOB_TYPES = ["full_time", "contract", "internship"]
 REMOTE_TYPES = ["remote", "hybrid", "on-site"]
@@ -159,8 +161,7 @@ class MockJobProvider(BaseJobProvider):
             days_ago = random.randint(0, 30)
             posted = datetime.utcnow() - timedelta(days=days_ago)
 
-            apply_id = random.randint(100000, 999999)
-            apply_url = f"{random.choice(APPLY_URL_PREFIXES)}/{apply_id}"
+            apply_url = _build_apply_url(template["title"], company)
 
             desc = (
                 f"We are looking for a talented {template['title']} to join {company}. "

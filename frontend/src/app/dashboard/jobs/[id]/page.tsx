@@ -45,16 +45,11 @@ export default function JobDetailPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await jobService.search({ query: "", page: 1, per_page: 50 });
-      const found = data.jobs.find((j: JobData) => j.id === jobId);
-      if (found) {
-        setJob(found);
-        setSelectedJob({ job: found });
-      } else {
-        setError("Job not found.");
-      }
+      const res = await jobService.getJob(jobId);
+      setJob(res.data);
+      setSelectedJob({ job: res.data });
     } catch (err: any) {
-      setError(err?.error?.message || "Failed to load job details.");
+      setError(err?.message || "Failed to load job details.");
     } finally {
       setLoading(false);
     }

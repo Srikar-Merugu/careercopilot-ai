@@ -217,6 +217,18 @@ export const jobService = {
     };
   },
 
+  async getJob(jobId: string): Promise<{ success: boolean; data: JobData }> {
+    try {
+      const response = await apiClient.get<{ success: boolean; data: JobData }>(`/jobs/${jobId}`);
+      return response.data;
+    } catch (e) {
+      const allJobs = searchMockJobs("", {}, 1, 500);
+      const job = allJobs.jobs.find((j) => j.id === jobId);
+      if (!job) throw new Error("Job not found");
+      return { success: true, data: mockJobToJobData(job) };
+    }
+  },
+
   async getMatch(jobId: string): Promise<MatchResponse> {
     try {
       const response = await apiClient.get<MatchResponse>(`/jobs/${jobId}/match`);

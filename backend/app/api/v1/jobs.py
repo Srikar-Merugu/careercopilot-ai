@@ -115,6 +115,67 @@ async def search_jobs(
     )
 
 
+@router.get("/{job_id}")
+async def get_job(
+    job_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    job_data = None
+    for provider in get_providers():
+        job_data = provider.get_by_id(job_id)
+        if job_data:
+            break
+
+    if not job_data:
+        job = await Job.find_one(Job.id == job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+        job_dict = {
+            "id": str(job.id),
+            "source": job.source,
+            "title": job.title,
+            "company": job.company,
+            "company_logo": job.company_logo,
+            "location": job.location,
+            "salary_min": job.salary_min,
+            "salary_max": job.salary_max,
+            "salary_currency": job.salary_currency,
+            "description": job.description,
+            "requirements": job.requirements,
+            "required_skills": job.required_skills or [],
+            "experience_required": job.experience_required,
+            "job_type": job.job_type,
+            "remote_type": job.remote_type,
+            "apply_url": job.apply_url,
+            "category": job.category,
+            "posted_at": job.posted_at,
+            "created_at": job.created_at,
+        }
+        return {"success": True, "data": JobResponse(**job_dict)}
+
+    return {"success": True, "data": JobResponse(
+        id=job_data.source_id,
+        source=job_data.source,
+        title=job_data.title,
+        company=job_data.company,
+        company_logo=job_data.company_logo,
+        location=job_data.location,
+        salary_min=job_data.salary_min,
+        salary_max=job_data.salary_max,
+        salary_currency=job_data.salary_currency,
+        description=job_data.description,
+        requirements=job_data.requirements,
+        required_skills=job_data.required_skills or [],
+        experience_required=job_data.experience_required,
+        job_type=job_data.job_type,
+        remote_type=job_data.remote_type,
+        apply_url=job_data.apply_url,
+        category=job_data.category,
+        posted_at=job_data.posted_at,
+        created_at=job_data.posted_at or datetime.utcnow(),
+    )}
+
+
 @router.get("/{job_id}/match")
 async def get_job_match(
     job_id: str,
