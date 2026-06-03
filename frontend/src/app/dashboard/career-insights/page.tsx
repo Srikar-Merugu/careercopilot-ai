@@ -23,6 +23,7 @@ import {
 import { useCareerInsight, useRecommendations, useTrendingSkills } from "@/hooks/use-ai";
 import { useAIStore } from "@/store/ai-store";
 import { useResumeStore, ResumeAnalysis } from "@/store/resume-store";
+import { useAuthStore } from "@/store/auth-store";
 import { CareerInsight } from "@/services/ai-service";
 import { resumeService } from "@/services/resume-service";
 import { useToast } from "@/providers/toast-provider";
@@ -46,6 +47,7 @@ export default function CareerInsightsPage() {
     trendingSkills, isLoading, activeTab, setActiveTab,
   } = useAIStore();
   const { currentAnalysis } = useResumeStore();
+  const { user } = useAuthStore();
 
   const latestAnalysis = currentAnalysis;
   const userSkills = useMemo(() => {
@@ -54,7 +56,7 @@ export default function CareerInsightsPage() {
 
   const userExperience = latestAnalysis?.parsed_experience?.map(e => `${e.title} at ${e.company} (${e.duration})`).join(". ") || "";
   const userEducation = latestAnalysis?.parsed_education?.map(e => `${e.degree} at ${e.institution}`).join(". ") || "";
-  const userId = typeof window !== "undefined" ? localStorage.getItem("cc_user_id") || "default-user" : "default-user";
+  const userId = user?.id || "default-user";
 
   const { isLoading: insightLoading } = useCareerInsight(userSkills, userExperience, userEducation);
   const { isLoading: recsLoading } = useRecommendations(userId, userSkills);
@@ -63,6 +65,7 @@ export default function CareerInsightsPage() {
   const { toast } = useToast();
   const [uploadingFile, setUploadingFile] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [loadingAnalysis, setLoadingAnalysis] = useState(true);
 
   const analysisToInsight = useCallback((a: ResumeAnalysis): CareerInsight => ({
     id: `ci_${a.id || Date.now()}`,
@@ -86,20 +89,21 @@ export default function CareerInsightsPage() {
   }, [careerInsight, currentAnalysis, analysisToInsight]);
 
   useEffect(() => {
-    if (!currentAnalysis) {
-      resumeService.list().then(list => {
-        const analyzed = list.find(r => r.status === "analyzed") || list[0];
-        if (analyzed) {
-          resumeService.getAnalysis(analyzed.id).then(result => {
-            if (result.success && result.data) {
-              useResumeStore.getState().setCurrentAnalysis(result.data);
-              useAIStore.getState().setCareerInsight(analysisToInsight(result.data));
-            }
-          }).catch(() => {});
+    setLoadingAnalysis(true);
+    resumeService.getMyLatestAnalysis()
+      .then(result => {
+        if (result.success && result.data) {
+          useResumeStore.getState().setCurrentAnalysis(result.data);
+          useAIStore.getState().setCareerInsight(analysisToInsight(result.data));
         }
-      }).catch(() => {});
-    }
-  }, []);
+      })
+      .catch((err) => {
+        console.warn("Could not load latest analysis", err);
+      })
+      .finally(() => {
+        setLoadingAnalysis(false);
+      });
+  }, [analysisToInsight]);
 
   const handleUpload = useCallback(async (file: File) => {
     const validTypes = [
@@ -230,7 +234,7 @@ export default function CareerInsightsPage() {
               })}
             </div>
 
-            {isLoading || insightLoading || uploadingFile ? (
+            {isLoading || insightLoading || uploadingFile || loadingAnalysis ? (
               <div className="flex items-center justify-center py-20">
                 <div className="flex flex-col items-center gap-3">
                   <div className="h-12 w-12 rounded-full border-2 border-primary border-t-transparent animate-spin" />

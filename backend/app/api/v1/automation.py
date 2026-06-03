@@ -2,6 +2,7 @@ import logging
 from typing import List, Optional, Dict, Any
 from datetime import datetime, date
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from beanie import PydanticObjectId
 
 from backend.app.schemas.automation import (
@@ -28,6 +29,9 @@ from backend.app.core.security import get_current_user
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# Keep references to background tasks to prevent garbage collection
+_background_tasks = set()
 
 
 @router.post("/apply", response_model=dict)
@@ -273,6 +277,41 @@ async def update_automation_settings(
     return settings
 
 
+@router.get("/pipeline/stream")
+async def stream_pipeline(current_user: dict = Depends(get_current_user)):
+    user_id = current_user.get("id")
+
+    async def event_generator():
+        import json
+        import asyncio
+        while True:
+            pipeline = await AutomationPipeline.find(
+                AutomationPipeline.user_id == user_id
+            ).sort(-AutomationPipeline.created_at).limit(1).first_or_none()
+
+            if pipeline:
+                data = {
+                    "pipeline_id": str(pipeline.id),
+                    "status": pipeline.status,
+                    "phase": pipeline.current_phase,
+                    "jobs_scanned": pipeline.jobs_scanned,
+                    "jobs_matched": pipeline.jobs_matched,
+                    "jobs_queued": pipeline.jobs_queued,
+                    "error_message": pipeline.error_message,
+                }
+                yield f"data: {json.dumps(data)}\n\n"
+
+                if pipeline.status in ["completed", "failed", "interrupted"]:
+                    break
+            else:
+                yield f"data: {json.dumps({'status': 'idle', 'phase': ''})}\n\n"
+                break
+
+            await asyncio.sleep(1)
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
 @router.post("/pipeline/start", response_model=PipelineStartResponse)
 async def start_automation_pipeline(current_user: dict = Depends(get_current_user)):
     user_id = current_user.get("id")
@@ -297,7 +336,9 @@ async def start_automation_pipeline(current_user: dict = Depends(get_current_use
     await automation_notifier.pipeline_started(user_id, str(pipeline.id))
 
     import asyncio
-    asyncio.create_task(_run_pipeline(pipeline, settings, user_id))
+    task = asyncio.create_task(_run_pipeline(pipeline, settings, user_id))
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
 
     return PipelineStartResponse(
         ok=True,
@@ -309,53 +350,71 @@ async def start_automation_pipeline(current_user: dict = Depends(get_current_use
 async def _run_pipeline(pipeline: AutomationPipeline, settings: AutomationSettings, user_id: str):
     pipeline_id = str(pipeline.id)
     try:
+        await automation_engine.update_phase(pipeline_id, phase="initializing")
+
+        # 1. Resume-Based User Understanding
+        from backend.app.services.profiler import ai_profiler
+        career_profile = await ai_profiler.create_profile(user_id)
+        logger.info(f"Loaded AI profile for user {user_id}: {career_profile.get('experience_level')} level, skills: {len(career_profile.get('skills', []))}")
+
         await automation_engine.update_phase(pipeline_id, phase="searching_jobs")
 
         import asyncio
         from backend.app.services.job_providers.base import SearchFilters
+        from backend.app.services.job_crawler import job_crawler
+
+        # Build search query based on preferred roles or profile target roles
+        search_query = " ".join(settings.preferred_roles) if settings.preferred_roles else (career_profile.get("role_preferences") and career_profile.get("role_preferences")[0] or "software engineer")
+        location_query = settings.preferred_locations[0] if settings.preferred_locations else None
 
         filters = SearchFilters(
-            query=" ".join(settings.preferred_roles) if settings.preferred_roles else "software engineer",
-            page=1, per_page=50,
+            query=search_query,
+            location=location_query,
+            page=1,
+            per_page=50,
         )
 
-        all_jobs = []
-        adzuna_used = False
-        try:
-            from backend.app.services.job_providers.adzuna_provider import adzuna_provider
-            if adzuna_provider.enabled:
-                search_result = await asyncio.to_thread(adzuna_provider.search, filters)
-                if search_result and search_result.jobs:
-                    all_jobs = search_result.jobs
-                    adzuna_used = True
-        except Exception as e:
-            logger.warning(f"Adzuna search failed: {e}")
-
-        if not all_jobs:
-            from backend.app.services.job_providers.mock_provider import mock_provider
-            search_result = mock_provider.search(filters)
-            all_jobs = search_result.jobs
+        # 2. Real Job Search Engine
+        all_jobs = await job_crawler.crawl_jobs(filters, settings.platforms or ["linkedin", "naukri", "wellfound", "internshala"])
 
         await automation_engine.update_phase(
             pipeline_id, phase="matching_jobs", jobs_scanned=len(all_jobs),
         )
 
-        user_skills = []
+        user_skills = career_profile.get("skills", [])
         resume_text = ""
         resume = None
         try:
-            from backend.app.models.resume import Resume, ResumeAnalysis
+            from backend.app.models.resume import Resume
             resume = await Resume.find(Resume.user_id == user_id).sort(-Resume.created_at).limit(1).first_or_none()
             if resume:
                 resume_text = resume.parsed_text or ""
-                analysis = await ResumeAnalysis.find_one(ResumeAnalysis.resume_id == resume.id)
-                if analysis and analysis.parsed_skills:
-                    user_skills = analysis.parsed_skills
-                elif resume.parsed_text:
-                    from backend.app.services.ai_analyzer import ai_analyzer
-                    user_skills = ai_analyzer._extract_skills_simple(resume.parsed_text)
         except Exception as e:
-            logger.warning(f"Could not load resume skills: {e}")
+            logger.warning(f"Could not load resume document text: {e}")
+
+        # 3. Smart Job Filtering
+        filtered_jobs = []
+        for job in all_jobs:
+            # Filter blacklisted companies
+            if job.company and any(bc.lower() in job.company.lower() for bc in (settings.excluded_companies or [])):
+                logger.info(f"Filtered out blacklisted company job: {job.title} at {job.company}")
+                continue
+
+            # Filter remote opening preference
+            if settings.remote_only and job.remote_type != "remote":
+                logger.info(f"Filtered out non-remote job: {job.title} at {job.company}")
+                continue
+
+            # Filter duplicates
+            existing = await AutoApplication.find_one(
+                AutoApplication.user_id == user_id,
+                AutoApplication.job_url == job.apply_url,
+            )
+            if existing:
+                logger.info(f"Filtered out duplicate job application: {job.title} at {job.company}")
+                continue
+
+            filtered_jobs.append(job)
 
         jobs_dict = [
             {
@@ -367,9 +426,10 @@ async def _run_pipeline(pipeline: AutomationPipeline, settings: AutomationSettin
                 "location": j.location or "",
                 "salary": f"{j.salary_min}-{j.salary_max}" if j.salary_min else None,
             }
-            for j in all_jobs if j.required_skills
+            for j in filtered_jobs if j.required_skills
         ]
 
+        matched_jobs_list = []
         if jobs_dict and resume_text:
             try:
                 matched_results = semantic_matching_service.batch_match(
@@ -379,32 +439,21 @@ async def _run_pipeline(pipeline: AutomationPipeline, settings: AutomationSettin
                     top_k=settings.daily_limit,
                     resume_title=getattr(resume, "job_title", None) if resume else None,
                 )
-                matched_jobs_list = []
                 for mr in matched_results:
                     score = mr["match_score"]
                     if score >= settings.min_match_score:
                         original = next(
-                            (j for j in all_jobs if j.source_id == mr["job_id"]),
+                            (j for j in filtered_jobs if j.source_id == mr["job_id"]),
                             None,
                         )
                         if original:
                             matched_jobs_list.append((original, score))
             except Exception as e:
-                logger.warning(f"Semantic matching failed, falling back to keyword: {e}")
-                matched_jobs_list = []
-                for job in all_jobs:
-                    if not job.required_skills:
-                        continue
-                    match_count = sum(
-                        1 for s in job.required_skills
-                        if any(s.lower() in (us.lower()) for us in user_skills)
-                    )
-                    match_pct = (match_count / len(job.required_skills)) * 100 if job.required_skills else 0
-                    if match_pct >= settings.min_match_score:
-                        matched_jobs_list.append((job, match_pct))
-        else:
-            matched_jobs_list = []
-            for job in all_jobs:
+                logger.warning(f"Semantic batch match failed, using simple filter: {e}")
+
+        # Fallback keyword match if semantic is empty or failed
+        if not matched_jobs_list:
+            for job in filtered_jobs:
                 if not job.required_skills:
                     continue
                 match_count = sum(
@@ -423,6 +472,7 @@ async def _run_pipeline(pipeline: AutomationPipeline, settings: AutomationSettin
         queue_count = 0
         for job, match_pct in matched_jobs_list[:settings.daily_limit]:
             try:
+                await automation_engine.update_phase(pipeline_id, phase="cover_letter_generation")
                 cover_letter_content = ""
                 if settings.auto_generate_cover_letter:
                     cover_letter_content = await cover_letter_generator.generate(
@@ -441,7 +491,7 @@ async def _run_pipeline(pipeline: AutomationPipeline, settings: AutomationSettin
                         ai_generated=True,
                     ).insert()
 
-                platform_used = job.source or ("adzuna" if adzuna_used else "mock")
+                platform_used = job.source or "generic"
 
                 app = await AutoApplication(
                     user_id=user_id,
@@ -462,6 +512,12 @@ async def _run_pipeline(pipeline: AutomationPipeline, settings: AutomationSettin
                     company=job.company,
                     platform=platform_used,
                     job_url=job.apply_url or "",
+                    meta_data={
+                        "candidate_name": getattr(resume, "parsed_name", "Candidate"),
+                        "skills": job.required_skills,
+                        "cover_letter": cover_letter_content,
+                        "resume_path": getattr(resume, "file_url", ""),
+                    }
                 ).insert()
                 queue_count += 1
 

@@ -513,25 +513,5 @@ Return valid JSON only (no markdown, no code fences):
             "Python", "FastAPI", "PostgreSQL", "Docker", "AWS",
         ]
 
-    @staticmethod
-    def _extract_skills_simple(text: str) -> list[str]:
-        common_skills = [
-            "JavaScript", "TypeScript", "Python", "Java", "Go", "Rust", "C++", "C#",
-            "React", "Angular", "Vue", "Next.js", "Node.js", "Django", "Flask", "FastAPI",
-            "Spring", "PostgreSQL", "MongoDB", "Redis", "MySQL", "Docker", "Kubernetes",
-            "AWS", "GCP", "Azure", "CI/CD", "Git", "GraphQL", "REST", "TailwindCSS",
-            "TensorFlow", "PyTorch", "Machine Learning", "Deep Learning", "NLP",
-            "HTML", "CSS", "SASS", "Redux", "Zustand", "Framer Motion",
-        ]
-        found = []
-        text_lower = text.lower()
-        for skill in common_skills:
-            if skill.lower() in text_lower:
-                found.append(skill)
-        return found if found else [
-            "JavaScript", "TypeScript", "React", "Next.js", "Node.js",
-            "Python", "FastAPI", "PostgreSQL", "Docker", "AWS",
-        ]
-
 
 ai_analyzer = AIAnalyzerService()

@@ -58,6 +58,13 @@ export const resumeService = {
     return response.data;
   },
 
+  async getMyLatestAnalysis(): Promise<{ success: boolean; data: ResumeAnalysis }> {
+    const response = await apiClient.get<{ success: boolean; data: ResumeAnalysis }>(
+      "/resume/my-latest-analysis"
+    );
+    return response.data;
+  },
+
   async delete(resumeId: string): Promise<void> {
     await apiClient.delete(`/resume/${resumeId}`);
   },

@@ -9,6 +9,7 @@ import {
   Globe, Loader2, AlertCircle, Edit3, Download,
 } from "lucide-react";
 import { autoApplyService, QuickStats, Application, CoverLetter, AutomationAnalytics, QueueStatus, AutomationSettings, QueueItem } from "@/services/auto-apply-service";
+import { useToast } from "@/providers/toast-provider";
 
 export default function AutoApplyPage() {
   const [activeTab, setActiveTab] = useState("overview");
@@ -33,7 +34,7 @@ export default function AutoApplyPage() {
 
   const fetchAll = useCallback(async () => {
     try {
-      const [s, a, apps, cls, qs, qi, pl, ps] = await Promise.allSettled([
+      const [s, a, apps, cls, qs, qi, pl, ps, sett] = await Promise.allSettled([
         autoApplyService.getStats(),
         autoApplyService.getAnalytics(),
         autoApplyService.getApplications(),
@@ -42,6 +43,7 @@ export default function AutoApplyPage() {
         autoApplyService.getQueue(),
         autoApplyService.getPlatformStatus(),
         autoApplyService.getPipelineStatus(),
+        autoApplyService.getSettings(),
       ]);
 
       if (s.status === "fulfilled") setStats(s.value);
@@ -64,6 +66,7 @@ export default function AutoApplyPage() {
           setAutomationRunning(false);
         }
       }
+      if (sett.status === "fulfilled") setSettings(sett.value);
     } catch (e) {
       setError("Failed to load automation data");
     } finally {
@@ -598,7 +601,7 @@ export default function AutoApplyPage() {
           </motion.div>
         )}
 
-        {activeTab === "settings" && analytics && (
+        {activeTab === "settings" && settings && (
           <motion.div
             key="settings"
             initial={{ opacity: 0, y: 10 }}
@@ -606,7 +609,7 @@ export default function AutoApplyPage() {
             exit={{ opacity: 0, y: -10 }}
             className="grid grid-cols-1 lg:grid-cols-2 gap-6"
           >
-            <SettingsPanel settings={analytics} />
+            <SettingsPanel settings={settings} onSave={fetchAll} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -614,53 +617,270 @@ export default function AutoApplyPage() {
   );
 }
 
-function SettingsPanel({ settings }: { settings: AutomationAnalytics }) {
+function SettingsPanel({ settings, onSave }: { settings: AutomationSettings; onSave: () => void }) {
+  const [formData, setFormData] = useState<AutomationSettings>({ ...settings });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const { toast } = useToast();
+
+  const handleChange = (field: keyof AutomationSettings, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleRolesChange = (val: string) => {
+    const roles = val.split(",").map(r => r.trim()).filter(Boolean);
+    handleChange("preferred_roles", roles);
+  };
+
+  const handleLocationsChange = (val: string) => {
+    const locations = val.split(",").map(l => l.trim()).filter(Boolean);
+    handleChange("preferred_locations", locations);
+  };
+
+  const handlePlatformToggle = (platform: string) => {
+    const platforms = formData.platforms || [];
+    if (platforms.includes(platform)) {
+      handleChange("platforms", platforms.filter(p => p !== platform));
+    } else {
+      handleChange("platforms", [...platforms, platform]);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setError("");
+    try {
+      await autoApplyService.updateSettings(formData);
+      toast("Settings Saved", "Automation configuration updated successfully.", "success");
+      onSave();
+    } catch (err: any) {
+      setError(err?.error?.message || "Failed to update settings");
+      toast("Error", "Could not save automation settings.", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
-    <div className="rounded-2xl border border-white/5 bg-black/40 backdrop-blur-xl p-6">
-      <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-6">
-        <Settings className="h-5 w-5 text-primary" />
-        Automation Settings
-      </h2>
-      <p className="text-sm text-muted-foreground mb-4">
-        Configure automation preferences via the API. Settings persist to your account.
-      </p>
-      <div className="space-y-5">
-        <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
-          <div>
-            <p className="text-sm font-medium text-white">Average Match Score</p>
-            <p className="text-xs text-muted-foreground">Current average across all applications</p>
-          </div>
-          <span className={`text-lg font-bold ${
-            settings.average_match_score >= 70 ? "text-emerald-400" : "text-amber-400"
-          }`}>{Math.round(settings.average_match_score)}%</span>
-        </div>
-        <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
-          <div>
-            <p className="text-sm font-medium text-white">Total Applications</p>
-            <p className="text-xs text-muted-foreground">Lifetime application count</p>
-          </div>
-          <span className="text-lg font-bold text-white">{settings.total_applications}</span>
-        </div>
-        <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
-          <div>
-            <p className="text-sm font-medium text-white">Success Rate</p>
-            <p className="text-xs text-muted-foreground">Submitted vs total applications</p>
-          </div>
-          <span className={`text-lg font-bold ${
-            settings.success_rate >= 70 ? "text-emerald-400" : "text-amber-400"
-          }`}>{Math.round(settings.success_rate)}%</span>
-        </div>
-        <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
-          <div>
-            <p className="text-sm font-medium text-white">Interviews & Offers</p>
-            <p className="text-xs text-muted-foreground">Real interview and offer tracking</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-medium text-primary">{settings.interview_count} interviews</span>
-            <span className="text-sm font-medium text-emerald-400">{settings.offer_count} offers</span>
-          </div>
+    <div className="rounded-2xl border border-white/5 bg-black/40 backdrop-blur-xl p-6 col-span-1 lg:col-span-2">
+      <div className="flex items-center justify-between mb-6 border-b border-white/5 pb-4">
+        <div>
+          <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+            <Settings className="h-5 w-5 text-primary" />
+            Automation Settings
+          </h2>
+          <p className="text-xs text-muted-foreground mt-1">
+            Customize how the autonomous AI application agent searches and applies for jobs.
+          </p>
         </div>
       </div>
+
+      {error && (
+        <div className="mb-4 flex items-center gap-2 px-4 py-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          {error}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* Left Column: Limits and Filtering */}
+          <div className="space-y-6">
+            <div>
+              <label className="block text-xs font-semibold text-white uppercase tracking-wider mb-2">
+                Daily Application Limit
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={100}
+                value={formData.daily_limit}
+                onChange={(e) => handleChange("daily_limit", parseInt(e.target.value) || 1)}
+                className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-white text-sm focus:outline-none focus:border-primary/50 transition-colors"
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Maximum number of job applications submitted automatically per day.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-white uppercase tracking-wider mb-2">
+                Minimum Match Score ({formData.min_match_score}%)
+              </label>
+              <div className="flex items-center gap-4">
+                <input
+                  type="range"
+                  min={1}
+                  max={100}
+                  value={formData.min_match_score}
+                  onChange={(e) => handleChange("min_match_score", parseInt(e.target.value) || 50)}
+                  className="flex-1 accent-primary h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer"
+                />
+                <span className="text-sm font-bold text-primary w-10 text-right">{formData.min_match_score}%</span>
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                AI semantic similarity score threshold for automatic submission.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-white uppercase tracking-wider mb-2">
+                Preferred Roles
+              </label>
+              <input
+                type="text"
+                placeholder="e.g., Software Engineer, React Developer"
+                value={formData.preferred_roles?.join(", ") || ""}
+                onChange={(e) => handleRolesChange(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-white text-sm focus:outline-none focus:border-primary/50 transition-colors"
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Comma-separated keywords for targeted roles.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-white uppercase tracking-wider mb-2">
+                Preferred Locations
+              </label>
+              <input
+                type="text"
+                placeholder="e.g., San Francisco, Remote, New York"
+                value={formData.preferred_locations?.join(", ") || ""}
+                onChange={(e) => handleLocationsChange(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-white text-sm focus:outline-none focus:border-primary/50 transition-colors"
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Comma-separated locations. Leave empty for any.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-white uppercase tracking-wider mb-2">
+                Automation Intensity
+              </label>
+              <select
+                value={formData.automation_aggressiveness || "moderate"}
+                onChange={(e) => handleChange("automation_aggressiveness", e.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl bg-[#0e122b] border border-white/10 text-white text-sm focus:outline-none focus:border-primary/50 transition-colors"
+              >
+                <option value="conservative">Conservative (High caution, manual checks)</option>
+                <option value="moderate">Moderate (Standard automatic queueing)</option>
+                <option value="aggressive">Aggressive (Speed-oriented, immediate submit)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Right Column: Toggles & Platforms */}
+          <div className="space-y-6">
+            <div>
+              <label className="block text-xs font-semibold text-white uppercase tracking-wider mb-3">
+                Job Platforms
+              </label>
+              <div className="grid grid-cols-2 gap-2.5">
+                {["linkedin", "naukri", "wellfound", "internshala", "indeed", "foundit"].map((plat) => {
+                  const isChecked = (formData.platforms || []).includes(plat);
+                  return (
+                    <button
+                      type="button"
+                      key={plat}
+                      onClick={() => handlePlatformToggle(plat)}
+                      className={`flex items-center justify-between p-3 rounded-xl border text-sm font-medium transition-all ${
+                        isChecked
+                          ? "bg-primary/10 border-primary/40 text-white"
+                          : "bg-white/[0.02] border-white/5 text-muted-foreground hover:bg-white/[0.04]"
+                      }`}
+                    >
+                      <span className="capitalize">{plat}</span>
+                      <div className={`w-4 h-4 rounded flex items-center justify-center border ${
+                        isChecked ? "bg-primary border-primary text-white" : "border-white/20"
+                      }`}>
+                        {isChecked && <CheckCircle2 className="w-3.5 h-3.5" />}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="space-y-4 pt-2">
+              <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/5">
+                <div>
+                  <p className="text-sm font-medium text-white">Remote Only</p>
+                  <p className="text-[11px] text-muted-foreground">Only apply to fully remote job openings</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleChange("remote_only", !formData.remote_only)}
+                  className={`w-11 h-6 rounded-full transition-all relative ${
+                    formData.remote_only ? "bg-primary" : "bg-white/10"
+                  }`}
+                >
+                  <div className={`w-4 h-4 rounded-full bg-white absolute top-1 left-1 transition-transform ${
+                    formData.remote_only ? "translate-x-5" : "translate-x-0"
+                  }`} />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/5">
+                <div>
+                  <p className="text-sm font-medium text-white">AI Cover Letter Generation</p>
+                  <p className="text-[11px] text-muted-foreground">Automatically write tailored cover letters</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleChange("auto_generate_cover_letter", !formData.auto_generate_cover_letter)}
+                  className={`w-11 h-6 rounded-full transition-all relative ${
+                    formData.auto_generate_cover_letter ? "bg-primary" : "bg-white/10"
+                  }`}
+                >
+                  <div className={`w-4 h-4 rounded-full bg-white absolute top-1 left-1 transition-transform ${
+                    formData.auto_generate_cover_letter ? "translate-x-5" : "translate-x-0"
+                  }`} />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/5">
+                <div>
+                  <p className="text-sm font-medium text-white">Require Manual Confirmation</p>
+                  <p className="text-[11px] text-muted-foreground">Review and approve applications before they submit</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleChange("require_confirmation", !formData.require_confirmation)}
+                  className={`w-11 h-6 rounded-full transition-all relative ${
+                    formData.require_confirmation ? "bg-primary" : "bg-white/10"
+                  }`}
+                >
+                  <div className={`w-4 h-4 rounded-full bg-white absolute top-1 left-1 transition-transform ${
+                    formData.require_confirmation ? "translate-x-5" : "translate-x-0"
+                  }`} />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="border-t border-white/5 pt-4 flex justify-end">
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            type="submit"
+            disabled={saving}
+            className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary/90 transition-all disabled:opacity-50"
+          >
+            {saving ? (
+              <><Loader2 className="h-4 w-4 animate-spin" /> Saving...</>
+            ) : (
+              "Save Settings"
+            )}
+          </motion.button>
+        </div>
+      </form>
     </div>
   );
 }

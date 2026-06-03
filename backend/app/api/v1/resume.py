@@ -194,6 +194,29 @@ async def list_resumes(
     ]
 
 
+@router.get("/my-latest-analysis")
+async def get_my_latest_analysis(
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = current_user.get("id")
+    resumes = await Resume.find(Resume.user_id == user_id).sort(-Resume.created_at).to_list()
+    if not resumes:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No resumes found. Please upload a resume first."
+        )
+
+    for r in resumes:
+        analysis = await ResumeAnalysis.find_one(ResumeAnalysis.resume_id == str(r.id))
+        if analysis:
+            return {"success": True, "data": _serialize_analysis(analysis)}
+
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="No resume analysis found. Please run resume analysis first."
+    )
+
+
 @router.get("/{resume_id}", response_model=ResumeDetailResponse)
 async def get_resume(
     resume_id: str,
